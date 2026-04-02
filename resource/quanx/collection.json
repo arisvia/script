@@ -1,0 +1,10 @@
+{
+  "name": "Collection",
+  "description": "💡 Collection Plugin",
+  "task": [
+    "55 23 * * * https://raw.githubusercontent.com/sub-store-org/Sub-Store/release/cron-sync-artifacts.min.js, tag=Sub-Store, img-url=https://raw.githubusercontent.com/58xinian/icon/master/Sub-Store1.png",
+    "0 9 * * * https://raw.githubusercontent.com/Peng-YM/QuanX/master/Tasks/exchange.js, tag=Exchange, img-url=https://raw.githubusercontent.com/Orz-3/mini/master/Color/exchangerate.png",
+    "0 9 * * * https://raw.githubusercontent.com/Peng-YM/QuanX/master/Tasks/psn.js, tag=PSN, img-url=https://raw.githubusercontent.com/Orz-3/mini/master/Color/PSN.png",
+    "0 9 */7 * * https://raw.githubusercontent.com/Peng-YM/QuanX/master/Tasks/epic.js, tag=Epic, img-url=https://raw.githubusercontent.com/Orz-3/mini/master/Color/epic.png"
+  ]
+}

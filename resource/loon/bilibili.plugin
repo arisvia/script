@@ -1,0 +1,72 @@
+#!name = BiliBili
+#!desc = 🪐 BiliBili Universe
+#!icon = https://raw.githubusercontent.com/Orz-3/mini/master/Color/Bili.png
+#!homepage = https://biliuniverse.io
+#!openUrl = http://boxjs.com/#/app/BiliBili.Enhanced
+
+[General]
+force-http-engine-hosts = *:4480, *:4483, *:8000, *:8082, *:9102
+
+[Rewrite]
+^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.interface\.v1\.Search\/DefaultWords$ - reject
+^https?:\/\/api\.vc\.bilibili\.com\/search_svr\/v\d\/Search\/recommend_words - reject-dict
+^https?:\/\/api\.vc\.bilibili\.com\/topic_svr\/v1\/topic_svr - reject-dict
+^https?:\/\/api\.vc\.bilibili\.com\/dynamic_svr\/v1\/dynamic_svr\/mix_uplist - reject-dict
+^https?:\/\/manga\.bilibili\.com\/twirp\/comic\.v\d\.Comic\/Flash - reject-dict
+^https?:\/\/manga\.bilibili\.com\/twirp\/comic\.v\d\.Comic\/ListFlash - reject-dict
+^https:\/\/api\.live\.bilibili\.com\/xlive\/e-commerce-interface\/v1\/ecommerce-user\/get_shopping_info\? - reject-dict
+^https:\/\/api\.bilibili\.com\/pgc\/activity\/deliver\/material\/receive\? mock-response-body data-type=text status-code=200 data="{"code":0,"data":{"closeType":"close_win","container":[],"showTime":""},"message":"success"}"
+^https:\/\/api\.bilibili\.com\/pgc\/view\/v2\/app\/season\? response-body-json-jq 'del(.data.payment)'
+
+[Script]
+# ⚙️ Enhanced
+http-response ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/resource\/show\/tab\/v2\? requires-body=1, script-path=https://github.com/BiliUniverse/Enhanced/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/v2\/account\/mine(\/ipad)?\? requires-body=1, script-path=https://github.com/BiliUniverse/Enhanced/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/v2\/region\/index\? requires-body=1, script-path=https://github.com/BiliUniverse/Enhanced/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/v2\/channel\/region\/list\? requires-body=1, script-path=https://github.com/BiliUniverse/Enhanced/releases/latest/download/response.bundle.js
+
+# 🌐 Global
+http-request ^https?:\/\/www\.bilibili\.com\/bangumi\/play\/(ss|ep)\d+\/? requires-body=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.viewunite\.v1\.View\/View$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.viewunite\.v1\.View\/View$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/response.bundle.js
+http-request ^https?:\/\/api\.bili(bili\.com|api\.net)\/pgc\/view\/(v2\/app|web|pc)\/season\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/api\.bili(bili\.com|api\.net)\/pgc\/view\/(v2\/app|web|pc)\/season\? requires-body=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/api\.bili(bili\.com|api\.net)\/pgc\/view\/(v2\/app|web|pc)\/ep\/list\? requires-body=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/response.bundle.js
+http-request ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.playerunite\.v1\.Player\/PlayViewUnite$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.pgc\.gateway\.player\.v2\.PlayURL\/PlayView$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api\.bili(bili\.com|api\.net)\/pgc\/player\/(api|web)\/playurl(\/html5)?\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api\.bili(bili\.com|api\.net)\/pgc\/player\/web\/v2\/playurl\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/search\.bilibili\.com\/all\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.polymer\.app\.search\.v1\.Search\/(SearchAll|SearchByType)$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/v2\/search(\/type)?\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api\.bili(bili\.com|api\.net)\/x\/web-interface\/wbi\/search\/(all\/v2|type)\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api\.bili(bili\.com|api\.net)\/x\/web-interface\/search\/(all\/v2|type)\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/v2\/space\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api\.bili(bili\.com|api\.net)\/x\/space\/wbi\/acc\/info\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api\.bili(bili\.com|api\.net)\/x\/space\/acc\/info\? script-path=https://github.com/BiliUniverse/Global/releases/latest/download/request.bundle.js
+
+# 🔀 Redirect
+http-request ^https?:\/\/.+\.bilivideo\.com\/upgcxcode\/ script-path=https://github.com/BiliUniverse/Redirect/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/[adbcefxy0-9]+\.mcdn\.bilivideo\.cn(:(8000|8082))?\/v1\/resource\/ script-path=https://github.com/BiliUniverse/Redirect/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/[adbcefxy0-9]+\.mcdn\.bilivideo\.cn(:(4483|9102))?\/upgcxcode\/ script-path=https://github.com/BiliUniverse/Redirect/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(.+):4480\/upgcxcode\/ script-path=https://github.com/BiliUniverse/Redirect/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/upos-(hz|bstar1)-mirrorakam\.akamaized\.net/upgcxcode\/ script-path=https://github.com/BiliUniverse/Redirect/releases/latest/download/request.bundle.js
+
+# 🛡️ ADBlock
+http-request ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/v2\/feed\/index\? requires-body=0, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/app\.bili(bili\.com|api\.net)\/x\/v2\/(splash\/(brand\/list|event\/list2|list|show)|feed\/index(\/story)?|search\/square) requires-body=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/api\.bilibili\.com\/x\/web-interface\/wbi\/index\/top\/feed\/rcmd\? requires-body=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/api\.bili(bili\.com|api\.net)\/pgc\/page\/(bangumi|cinema\/tab\?) requires-body=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/api\.live\.bilibili\.com\/xlive\/app-room\/v1\/index\/getInfoByRoom requires-body=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.(view|viewunite)\.v1\.View\/(View|TFInfo|RelatesFeed)$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.dynamic\.v2\.Dynamic\/Dyn(All|Video)$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.playurl\.v1\.PlayURL\/PlayView$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https?:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.polymer\.app\.search\.v1\.Search\/SearchAll$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.community\.service\.dm\.v1\.DM\/(DmView|DmSegMobile) requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.app\.interface\.v1\.Teenagers\/ModeStatus requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.main\.community\.reply\.v1\.Reply\/MainList requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+http-response ^https:\/\/(grpc|app)\.bili(bili\.com|api\.net)\/bilibili\.pgc\.gateway\.player\.v2\.PlayURL\/PlayView$ requires-body=1, binary-body-mode=1, script-path=https://github.com/BiliUniverse/ADBlock/releases/latest/download/response.bundle.js
+
+[Mitm]
+hostname = www.bilibili.com, manga.bilibili.com, api.live.bilibili.com, api.vc.bilibili.com, app.bilibili.com, app.biliapi.net, search.bilibili.com, api.bilibili.com, api.global.bilibili.com, api.biliapi.net, grpc.biliapi.net, *.mcdn.bilivideo.cn, upos-sz-mirror*bstar1.bilivideo.com, upos-*-mirrorakam.akamaized.net
+h2 = true

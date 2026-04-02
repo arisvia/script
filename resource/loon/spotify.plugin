@@ -1,0 +1,34 @@
+#!name = Spotify
+#!desc = 🎵 DualSubs Spotify Enhance
+#!icon = https://raw.githubusercontent.com/Orz-3/mini/master/Color/Spotify.png
+#!homepage = https://dualsubs.github.io
+#!openUrl = http://boxjs.com/#/app/DualSubs.Spotify
+
+[Rewrite]
+^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/user-customization-service\/v1\/customize$ header-del if-none-match
+
+[Script]
+# App2smile Spotify JSON/Proto
+http-request ^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/(artistview\/v1\/artist|album-entity-view\/v2\/album)\/ script-path=https://raw.githubusercontent.com/app2smile/rules/master/js/spotify-json.js
+http-response ^https:\/\/(spclient\.wg\.spotify\.com|.*-spclient\.spotify\.com(:443)?)\/(bootstrap\/v1\/bootstrap|user-customization-service\/v1\/customize)$ requires-body=1, binary-body-mode=1, script-path=https://raw.githubusercontent.com/app2smile/rules/master/js/spotify-proto.js
+
+# DualSubs Spotify Tracks
+http-response ^https?:\/\/api\.spotify\.com\/v1\/tracks\? requires-body=1, script-path=https://github.com/DualSubs/Spotify/releases/latest/download/response.bundle.js
+
+# DualSubs Spotify Color Lyrics Request
+http-request ^https?:\/\/spclient\.wg\.spotify\.com\/color-lyrics\/v2\/track\/(.+)\?(.*)format=json requires-body=1, script-path=https://github.com/DualSubs/Spotify/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/spclient\.wg\.spotify\.com\/color-lyrics\/v2\/track\/\w+\?(.*) requires-body=1, binary-body-mode=1, script-path=https://github.com/DualSubs/Spotify/releases/latest/download/request.bundle.js
+
+# DualSubs Spotify Color Lyrics Translate Response
+http-response ^https?:\/\/spclient\.wg\.spotify\.com\/color-lyrics\/v2\/track\/(.+)\?(.*)format=json(.*)subtype=Translate requires-body=1, script-path=https://github.com/DualSubs/Universal/releases/latest/download/Translate.response.bundle.js
+http-response ^https?:\/\/spclient\.wg\.spotify\.com\/color-lyrics\/v2\/track\/\w+\?(.*)subtype=Translate requires-body=1, binary-body-mode=1, script-path=https://github.com/DualSubs/Universal/releases/latest/download/Translate.response.bundle.js
+
+# DualSubs Spotify Color Lyrics External Response
+http-response ^https?:\/\/spclient\.wg\.spotify\.com\/color-lyrics\/v2\/track\/(.+)\?(.*)format=json(.*)subtype=External requires-body=1, script-path=https://github.com/DualSubs/Universal/releases/latest/download/External.Lyrics.response.bundle.js
+http-response ^https?:\/\/spclient\.wg\.spotify\.com\/color-lyrics\/v2\/track\/\w+\?(.*)subtype=External requires-body=1, binary-body-mode=1, script-path=https://github.com/DualSubs/Universal/releases/latest/download/External.Lyrics.response.bundle.js
+
+# DualSubs Spotify Transcripts Translate Response
+http-response ^https?:\/\/(spclient\.wg\.spotify\.com\/transcript-read-along\/v2\/episode\/\w+|episode-transcripts\.spotifycdn\.com\/1\.0\/spotify:transcript:\w+) requires-body=1, binary-body-mode=1, script-path=https://raw.githubusercontent.com/DualSubs/Spotify/main/js/DualSubs.Transcripts.Translate.response.js
+
+[Mitm]
+hostname = *.spotify.com, episode-transcripts.spotifycdn.com

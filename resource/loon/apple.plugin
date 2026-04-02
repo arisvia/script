@@ -1,0 +1,63 @@
+#!name = Apple
+#!desc = 🍎 iRingo
+#!icon = https://raw.githubusercontent.com/Orz-3/mini/master/Color/Apple.png
+#!homepage = https://nsringo.github.io
+#!openUrl = http://boxjs.com/#/app/iRingo.WeatherKit
+
+[Rule]
+DOMAIN, weather-analytics-events.apple.com, REJECT-DROP
+DOMAIN-SUFFIX, tthr.apple.com, REJECT-DROP
+DOMAIN, tether.edge.apple, REJECT-DROP
+DOMAIN, gspe1-ssl.ls.apple.com, DIRECT
+DOMAIN, gspe19-cn-ssl.ls.apple.com, DIRECT
+DOMAIN, dispatcher.is.autonavi.com, DIRECT
+DOMAIN, direction2.is.autonavi.com, DIRECT
+DOMAIN, known-issues.apple.com, REJECT-DROP
+DOMAIN, gateway.icloud.com, PROXY
+DOMAIN, news-edge.apple.com, PROXY
+DOMAIN, news-events.apple.com, PROXY
+DOMAIN, apple.comscoreresearch.com, PROXY
+URL-REGEX, ^https?:\/\/news-assets\.apple\.com\/(audio-narrative|podcast\/audio)\/.*, PROXY
+
+[Rewrite]
+^https?:\/\/play-cdn\.itunes\.apple\.com header https://play.itunes.apple.com
+^https?:\/\/play-edge-cdn\.itunes\.apple\.com header https://play-edge.itunes.apple.com
+
+[Script]
+# ⛅️ WeatherKit
+http-response ^https?:\/\/weatherkit\.apple\.com\/api\/v1\/availability requires-body=1, script-path=https://github.com/NSRingo/WeatherKit/releases/latest/download/response.bundle.js
+http-request ^https?:\/\/weatherkit\.apple\.com\/api\/v2\/weather script-path=https://github.com/NSRingo/WeatherKit/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/weatherkit\.apple\.com\/api\/v2\/weather requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/WeatherKit/releases/latest/download/response.bundle.js
+
+# 📍 Location
+http-response ^https?:\/\/gspe1-ssl\.ls\.apple\.com\/pep\/gcc requires-body=1, script-path=https://github.com/NSRingo/GeoServices/releases/latest/download/response.bundle.js
+
+# 🗺️ Maps
+http-request ^https?:\/\/configuration\.ls\.apple\.com\/config\/defaults script-path=https://github.com/NSRingo/GeoServices/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/configuration\.ls\.apple\.com\/config\/defaults requires-body=1, script-path=https://github.com/NSRingo/GeoServices/releases/latest/download/response.bundle.js
+http-request ^https?:\/\/gspe35-ssl\.ls\.apple\.(com|cn)\/config\/announcements script-path=https://github.com/NSRingo/GeoServices/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/gspe35-ssl\.ls\.apple\.(com|cn)\/config\/announcements requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/GeoServices/releases/latest/download/response.bundle.js
+http-request ^https?:\/\/gspe35-ssl\.ls\.apple\.(com|cn)\/geo_manifest\/dynamic\/config script-path=https://github.com/NSRingo/GeoServices/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/gspe35-ssl\.ls\.apple\.(com|cn)\/geo_manifest\/dynamic\/config requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/GeoServices/releases/latest/download/response.bundle.js
+
+# ⭕ Siri
+http-request ^https?:\/\/(api-siri|api2|api-.+)\.smoot\.apple\.com\/search script-path=https://github.com/NSRingo/Siri/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(guzzoni|api2|api-.+)\.smoot\.apple\.com\/apple\.parsec\.siri\.v2alpha\.SiriSearch\/SiriSearch requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/Siri/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api-safari(-.+)?\.smoot\.apple\.com\/apple\.parsec\.safari\.v1alpha\.SafariSearch\/SafariSearch requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/Siri/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/api-lookup(-.+)?\.smoot\.apple\.com\/apple\.parsec\.lookup\.v1alpha\.LookupSearch\/LookupSearch requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/Siri/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(api2|api-.+)\.smoot\.apple\.com\/apple\.parsec\.visualsearch\.v2\.VisualSearch\/VisualSearch requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/Siri/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(api-.+)\.smoot\.apple\.com\/apple\.parsec\.responseframework\.engagement\.v1alpha\.EngagementSearch\/EngagementSearch requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/Siri/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/(api-.+)\.smoot\.apple\.com\/apple\.parsec\.spotlight\.v1alpha\.ZkwSuggestService\/Suggest requires-body=1, binary-body-mode=1, script-path=https://github.com/NSRingo/Siri/releases/latest/download/request.bundle.js
+
+# 📺 TV
+http-request ^https?:\/\/uts-api\.itunes\.apple\.com\/uts\/(v1|v2|v3)\/ requires-body=1, script-path=https://github.com/NSRingo/TV/releases/latest/download/request.bundle.js
+http-response ^https?:\/\/uts-api\.itunes\.apple\.com\/uts\/(v1|v2|v3)\/ requires-body=1, script-path=https://github.com/NSRingo/TV/releases/latest/download/response.bundle.js
+http-request ^https?:\/\/umc-tempo-api\.apple\.com\/(v1|v2|v3)\/ requires-body=1, script-path=https://github.com/NSRingo/TV/releases/latest/download/request.bundle.js
+
+# 📰 News
+http-request ^https?:\/\/news(-todayconfig)?-edge\.apple\.com\/v1\/configs requires-body=1, script-path=https://github.com/NSRingo/News/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/news(-sports)?-events\.apple\.com\/analyticseventsv2\/async requires-body=1, script-path=https://github.com/NSRingo/News/releases/latest/download/request.bundle.js
+http-request ^https?:\/\/news-client-search\.apple\.com\/v1\/search script-path=https://github.com/NSRingo/News/releases/latest/download/request.bundle.js
+
+[Mitm]
+hostname = weatherkit.apple.com, gspe1-ssl.ls.apple.com, configuration.ls.apple.com, gspe35-ssl.ls.apple.com, guzzoni.smoot.apple.com, api2.smoot.apple.com, api-*.smoot.apple.com, uts-api.itunes.apple.com, umc-tempo-api.apple.com, play-cdn.itunes.apple.com, play-edge-cdn.itunes.apple.com, news-edge.apple.com, news-todayconfig-edge.apple.com, news-events.apple.com, news-sports-events.apple.com, news-client.apple.com, news-client-search.apple.com

@@ -1,0 +1,21 @@
+#!name = Collection
+#!desc = 💡 Collection Plugin
+#!icon = https://raw.githubusercontent.com/Orz-3/mini/master/Color/Touhou.png
+#!openUrl = http://boxjs.com
+
+[Script]
+# 🏪 Sub-Store
+http-request ^https?:\/\/sub\.store\/((download)|api\/(preview|sync|(utils\/node-info))) requires-body=1, script-path=https://github.com/sub-store-org/Sub-Store/releases/latest/download/sub-store-1.min.js
+http-request ^https?:\/\/sub\.store requires-body=1, script-path=https://github.com/sub-store-org/Sub-Store/releases/latest/download/sub-store-0.min.js
+
+# 📦 BoxJs
+http-request ^https?:\/\/(.+\.)?boxjs\.(com|net) requires-body=1, script-path=https://raw.githubusercontent.com/chavyleung/scripts/master/box/chavy.boxjs.js
+
+# ⏲️ CronTask
+cron "55 23 * * *" script-path=https://raw.githubusercontent.com/sub-store-org/Sub-Store/release/cron-sync-artifacts.min.js, tag=Sub-Store
+cron "0 9 * * *" script-path=https://raw.githubusercontent.com/Peng-YM/QuanX/master/Tasks/exchange.js, tag=Exchange
+cron "0 9 * * *" script-path=https://raw.githubusercontent.com/Peng-YM/QuanX/master/Tasks/psn.js, tag=PSN
+cron "0 9 */7 * *" script-path=https://raw.githubusercontent.com/Peng-YM/QuanX/master/Tasks/epic.js, tag=Epic
+
+[Mitm]
+hostname = sub.store, *.boxjs.com
