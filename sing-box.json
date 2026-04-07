@@ -37,7 +37,11 @@
         "server": "google"
       },
       {
-        "rule_set": "cn",
+        "rule_set": [
+          "fakeip",
+          "trackers",
+          "cn"
+        ],
         "server": "aliyun"
       },
       {
@@ -123,7 +127,7 @@
     },
     {
       "type": "selector",
-      "tag": "Trackers",
+      "tag": "Speedtest",
       "outbounds": [
         "Available",
         "HK",
@@ -138,7 +142,22 @@
     },
     {
       "type": "selector",
-      "tag": "Google",
+      "tag": "Game-cn",
+      "outbounds": [
+        "Available",
+        "HK",
+        "TW",
+        "JP",
+        "KR",
+        "US",
+        "SG",
+        "Direct"
+      ],
+      "default": "Direct"
+    },
+    {
+      "type": "selector",
+      "tag": "Microsoft",
       "outbounds": [
         "Available",
         "HK",
@@ -168,7 +187,7 @@
     },
     {
       "type": "selector",
-      "tag": "Microsoft",
+      "tag": "Google",
       "outbounds": [
         "Available",
         "HK",
@@ -322,21 +341,6 @@
     },
     {
       "type": "selector",
-      "tag": "Speedtest",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "Direct"
-      ],
-      "default": "Direct"
-    },
-    {
-      "type": "selector",
       "tag": "Bypass",
       "outbounds": [
         "Direct",
@@ -469,24 +473,27 @@
         "outbound": "Direct"
       },
       {
-        "rule_set": [
-          "trackers",
-          "games-cn",
-          "hoyoverse"
-        ],
-        "outbound": "Trackers"
+        "rule_set": "speedtest",
+        "outbound": "Speedtest"
       },
       {
-        "rule_set": "google-cn",
-        "outbound": "Google"
+        "rule_set": [
+          "mihoyo",
+          "games-cn"
+        ],
+        "outbound": "Game-cn"
+      },
+      {
+        "rule_set": "microsoft-cn",
+        "outbound": "Microsoft"
       },
       {
         "rule_set": "apple-cn",
         "outbound": "Apple"
       },
       {
-        "rule_set": "microsoft-cn",
-        "outbound": "Microsoft"
+        "rule_set": "google-cn",
+        "outbound": "Google"
       },
       {
         "rule_set": "games",
@@ -538,10 +545,6 @@
         "outbound": "Media"
       },
       {
-        "rule_set": "speedtest",
-        "outbound": "Speedtest"
-      },
-      {
         "rule_set": [
           "tld",
           "gfw",
@@ -580,18 +583,28 @@
       },
       {
         "type": "remote",
+        "tag": "fakeip",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/fakeip-filter.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "speedtest",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/networktest.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "mihoyo",
+        "url": "https://github.com/MetaCubeX/meta-rules-dat/raw/sing/geo/geosite/mihoyo.srs"
+      },
+      {
+        "type": "remote",
         "tag": "games-cn",
         "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/games-cn.srs"
       },
       {
         "type": "remote",
-        "tag": "hoyoverse",
-        "url": "https://github.com/MetaCubeX/meta-rules-dat/raw/sing/geo/geosite/hoyoverse.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "google-cn",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/google-cn.srs"
+        "tag": "microsoft-cn",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/microsoft-cn.srs"
       },
       {
         "type": "remote",
@@ -600,8 +613,8 @@
       },
       {
         "type": "remote",
-        "tag": "microsoft-cn",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/microsoft-cn.srs"
+        "tag": "google-cn",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/google-cn.srs"
       },
       {
         "type": "remote",
@@ -667,11 +680,6 @@
         "type": "remote",
         "tag": "media_ip",
         "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/mediaip.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "speedtest",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/networktest.srs"
       },
       {
         "type": "remote",
