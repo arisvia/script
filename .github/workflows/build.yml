@@ -3,6 +3,19 @@ name: 🧪  CI Build
 on:
   workflow_dispatch:
     inputs:
+      repo:
+        description: "Build repo"
+        required: true
+        type: choice
+        default: "reF1nd/sing-box"
+        options:
+          - reF1nd/sing-box
+          - SagerNet/sing-box
+      branch:
+        description: "Build branch"
+        required: true
+        type: string
+        default: "reF1nd-testing-next"
       build:
         description: "Build type"
         required: true
@@ -29,8 +42,8 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ vars.REPOSITORY }}
-          ref: ${{ vars.BUILD_VERSION_TAG }}
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
 
       - name: 🔧 Setup Go
@@ -86,8 +99,8 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ vars.REPOSITORY }}
-          ref: ${{ vars.BUILD_VERSION_TAG }}
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
 
       - name: 🔧 Setup Go
@@ -327,8 +340,8 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ vars.REPOSITORY }}
-          ref: ${{ vars.BUILD_VERSION_TAG }}
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
 
       - name: 🔧 Setup Go
@@ -407,8 +420,8 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ vars.REPOSITORY }}
-          ref: ${{ vars.BUILD_VERSION_TAG }}
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
 
       - name: 🔧 Setup Go
@@ -513,8 +526,8 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ vars.REPOSITORY }}
-          ref: ${{ vars.BUILD_VERSION_TAG }}
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
 
       - name: 🔧 Setup Go
@@ -599,8 +612,8 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v6
         with:
-          repository: ${{ vars.REPOSITORY }}
-          ref: ${{ vars.BUILD_VERSION_TAG }}
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
           submodules: 'recursive'
 
