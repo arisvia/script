@@ -37,10 +37,19 @@
         "server": "google"
       },
       {
+        "action": "evaluate",
+        "server": "aliyun"
+      },
+      {
         "rule_set": [
-          "fakeip",
+          "fake-filter",
           "trackers",
-          "cn"
+          "speedtest",
+          "mihoyo",
+          "games-cn",
+          "microsoft-cn",
+          "apple-cn",
+          "google-cn"
         ],
         "server": "aliyun"
       },
@@ -57,7 +66,8 @@
             "invert": true
           },
           {
-            "rule_set": "cn_ip"
+            "rule_set": "cn_ip",
+            "match_response": true
           }
         ],
         "server": "google",
@@ -71,15 +81,19 @@
         "server": "remote"
       }
     ],
-    "strategy": "prefer_ipv4",
-    "independent_cache": true
+    "strategy": "prefer_ipv4"
   },
+  "http_clients": [
+    {
+      "tag": "default",
+      "version": 3
+    }
+  ],
   "providers": [
     {
       "type": "remote",
       "tag": "provider",
-      "url": "https://sub.store/download/Firefly",
-      "download_detour": "Direct"
+      "url": "https://sub.store/download/Firefly"
     }
   ],
   "inbounds": [
@@ -113,7 +127,8 @@
         "SG",
         "Proxy",
         "Direct"
-      ]
+      ],
+      "default": "JP"
     },
     {
       "type": "selector",
@@ -142,7 +157,7 @@
     },
     {
       "type": "selector",
-      "tag": "Game-cn",
+      "tag": "CNGame",
       "outbounds": [
         "Available",
         "HK",
@@ -481,7 +496,7 @@
           "mihoyo",
           "games-cn"
         ],
-        "outbound": "Game-cn"
+        "outbound": "CNGame"
       },
       {
         "rule_set": "microsoft-cn",
@@ -578,13 +593,13 @@
       },
       {
         "type": "remote",
-        "tag": "trackers",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/trackerslist.srs"
+        "tag": "fake-filter",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/fakeip-filter.srs"
       },
       {
         "type": "remote",
-        "tag": "fakeip",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/fakeip-filter.srs"
+        "tag": "trackers",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/trackerslist.srs"
       },
       {
         "type": "remote",
@@ -715,7 +730,7 @@
     "cache_file": {
       "enabled": true,
       "store_fakeip": true,
-      "store_rdrc": true
+      "store_dns": true
     },
     "clash_api": {
       "external_controller": "[::]:9090",
