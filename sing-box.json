@@ -8,7 +8,7 @@
       {
         "type": "https",
         "tag": "google",
-        "detour": "Proxy",
+        "detour": "Available",
         "server": "8.8.8.8"
       },
       {
@@ -42,14 +42,9 @@
       },
       {
         "rule_set": [
-          "fake-filter",
+          "fakeip",
           "trackers",
-          "speedtest",
-          "mihoyo",
-          "games-cn",
-          "microsoft-cn",
-          "apple-cn",
-          "google-cn"
+          "cn"
         ],
         "server": "aliyun"
       },
@@ -66,7 +61,7 @@
             "invert": true
           },
           {
-            "rule_set": "cn_ip",
+            "rule_set": "cnip",
             "match_response": true
           }
         ],
@@ -102,15 +97,6 @@
       "tag": "tproxy-in",
       "listen": "::",
       "listen_port": 12345
-    },
-    {
-      "type": "tun",
-      "address": [
-        "172.18.0.1/30",
-        "fdfe:dcba:9876::1/126"
-      ],
-      "auto_route": true,
-      "strict_route": true
     }
   ],
   "outbounds": [
@@ -125,15 +111,10 @@
         "KR",
         "US",
         "SG",
-        "Proxy",
         "Direct"
       ],
+      "use_all_providers": true,
       "default": "JP"
-    },
-    {
-      "type": "selector",
-      "tag": "Proxy",
-      "use_all_providers": true
     },
     {
       "type": "direct",
@@ -142,67 +123,7 @@
     },
     {
       "type": "selector",
-      "tag": "Speedtest",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "Direct"
-      ],
-      "default": "Direct"
-    },
-    {
-      "type": "selector",
-      "tag": "CNGame",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "Direct"
-      ],
-      "default": "Direct"
-    },
-    {
-      "type": "selector",
-      "tag": "Microsoft",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "Direct"
-      ],
-      "default": "Direct"
-    },
-    {
-      "type": "selector",
-      "tag": "Apple",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "Direct"
-      ],
-      "default": "Direct"
-    },
-    {
-      "type": "selector",
-      "tag": "Google",
+      "tag": "Service",
       "outbounds": [
         "Available",
         "HK",
@@ -261,46 +182,6 @@
     },
     {
       "type": "selector",
-      "tag": "Bahamut",
-      "outbounds": [
-        "Available",
-        "TW",
-        "HK",
-        "Direct"
-      ],
-      "default": "TW"
-    },
-    {
-      "type": "selector",
-      "tag": "Spotify",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "Direct"
-      ]
-    },
-    {
-      "type": "selector",
-      "tag": "TikTok",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "Direct"
-      ],
-      "default": "JP"
-    },
-    {
-      "type": "selector",
       "tag": "BiliBili",
       "outbounds": [
         "Available",
@@ -342,6 +223,35 @@
     },
     {
       "type": "selector",
+      "tag": "Spotify",
+      "outbounds": [
+        "Available",
+        "HK",
+        "TW",
+        "JP",
+        "KR",
+        "US",
+        "SG",
+        "Direct"
+      ]
+    },
+    {
+      "type": "selector",
+      "tag": "TikTok",
+      "outbounds": [
+        "Available",
+        "HK",
+        "TW",
+        "JP",
+        "KR",
+        "US",
+        "SG",
+        "Direct"
+      ],
+      "default": "JP"
+    },
+    {
+      "type": "selector",
       "tag": "Media",
       "outbounds": [
         "Available",
@@ -360,14 +270,6 @@
       "outbounds": [
         "Direct",
         "Available"
-      ]
-    },
-    {
-      "type": "selector",
-      "tag": "Final",
-      "outbounds": [
-        "Available",
-        "Direct"
       ]
     },
     {
@@ -457,7 +359,7 @@
       },
       {
         "clash_mode": "global",
-        "outbound": "Proxy"
+        "outbound": "Available"
       },
       {
         "type": "logical",
@@ -477,38 +379,21 @@
         "action": "reject"
       },
       {
+        "rule_set": "private",
+        "outbound": "Direct"
+      },
+      {
         "rule_set": "ads",
         "action": "reject"
       },
       {
         "rule_set": [
-          "private",
-          "private_ip"
+          "games-cn",
+          "microsoft-cn",
+          "apple-cn",
+          "google-cn"
         ],
-        "outbound": "Direct"
-      },
-      {
-        "rule_set": "speedtest",
-        "outbound": "Speedtest"
-      },
-      {
-        "rule_set": [
-          "mihoyo",
-          "games-cn"
-        ],
-        "outbound": "CNGame"
-      },
-      {
-        "rule_set": "microsoft-cn",
-        "outbound": "Microsoft"
-      },
-      {
-        "rule_set": "apple-cn",
-        "outbound": "Apple"
-      },
-      {
-        "rule_set": "google-cn",
-        "outbound": "Google"
+        "outbound": "Service"
       },
       {
         "rule_set": "games",
@@ -519,15 +404,16 @@
         "outbound": "AI"
       },
       {
-        "rule_set": [
-          "telegram",
-          "telegram_ip"
-        ],
-        "outbound": "Telegram"
+        "rule_set": "bilibili",
+        "outbound": "BiliBili"
       },
       {
-        "rule_set": "bahamut",
-        "outbound": "Bahamut"
+        "rule_set": "netflix",
+        "outbound": "Netflix"
+      },
+      {
+        "rule_set": "youtube",
+        "outbound": "YouTube"
       },
       {
         "rule_set": "spotify",
@@ -538,25 +424,7 @@
         "outbound": "TikTok"
       },
       {
-        "rule_set": "bilibili",
-        "outbound": "BiliBili"
-      },
-      {
-        "rule_set": [
-          "netflix",
-          "netflix_ip"
-        ],
-        "outbound": "Netflix"
-      },
-      {
-        "rule_set": "youtube",
-        "outbound": "YouTube"
-      },
-      {
-        "rule_set": [
-          "media",
-          "media_ip"
-        ],
+        "rule_set": "media",
         "outbound": "Media"
       },
       {
@@ -568,19 +436,31 @@
         "outbound": "Available"
       },
       {
-        "rule_set": [
-          "cn",
-          "cn_ip"
-        ],
+        "rule_set": "cn",
+        "outbound": "Bypass"
+      },
+      {
+        "rule_set": "privateip",
+        "outbound": "Direct"
+      },
+      {
+        "rule_set": "telegramip",
+        "outbound": "Telegram"
+      },
+      {
+        "rule_set": "netflixip",
+        "outbound": "Netflix"
+      },
+      {
+        "rule_set": "mediaip",
+        "outbound": "Media"
+      },
+      {
+        "rule_set": "cnip",
         "outbound": "Bypass"
       }
     ],
     "rule_set": [
-      {
-        "type": "remote",
-        "tag": "ads",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/ads.srs"
-      },
       {
         "type": "remote",
         "tag": "private",
@@ -588,33 +468,18 @@
       },
       {
         "type": "remote",
-        "tag": "private_ip",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/privateip.srs"
+        "tag": "ads",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/ads.srs"
       },
       {
         "type": "remote",
-        "tag": "fake-filter",
+        "tag": "fakeip",
         "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/fakeip-filter.srs"
       },
       {
         "type": "remote",
         "tag": "trackers",
         "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/trackerslist.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "speedtest",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/networktest.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "mihoyo",
-        "url": "https://github.com/MetaCubeX/meta-rules-dat/raw/sing/geo/geosite/mihoyo.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "games-cn",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/games-cn.srs"
       },
       {
         "type": "remote",
@@ -633,6 +498,11 @@
       },
       {
         "type": "remote",
+        "tag": "games-cn",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/games-cn.srs"
+      },
+      {
+        "type": "remote",
         "tag": "games",
         "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/games.srs"
       },
@@ -643,18 +513,13 @@
       },
       {
         "type": "remote",
-        "tag": "telegram",
-        "url": "https://github.com/MetaCubeX/meta-rules-dat/raw/sing/geo-lite/geosite/telegram.srs"
+        "tag": "netflix",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/netflix.srs"
       },
       {
         "type": "remote",
-        "tag": "telegram_ip",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/telegramip.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "bahamut",
-        "url": "https://github.com/MetaCubeX/meta-rules-dat/raw/sing/geo-lite/geosite/bahamut.srs"
+        "tag": "youtube",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/youtube.srs"
       },
       {
         "type": "remote",
@@ -673,28 +538,8 @@
       },
       {
         "type": "remote",
-        "tag": "netflix",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/netflix.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "netflix_ip",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/netflixip.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "youtube",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/youtube.srs"
-      },
-      {
-        "type": "remote",
         "tag": "media",
         "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/media.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "media_ip",
-        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/mediaip.srs"
       },
       {
         "type": "remote",
@@ -718,11 +563,31 @@
       },
       {
         "type": "remote",
-        "tag": "cn_ip",
+        "tag": "privateip",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/privateip.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "telegramip",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/telegramip.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "netflixip",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/netflixip.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "mediaip",
+        "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/mediaip.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "cnip",
         "url": "https://github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/cnip.srs"
       }
     ],
-    "final": "Final",
+    "final": "Available",
     "auto_detect_interface": true,
     "default_domain_resolver": "aliyun"
   },
@@ -735,7 +600,7 @@
     "clash_api": {
       "external_controller": "[::]:9090",
       "external_ui": "ui",
-      "external_ui_download_url": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip"
+      "external_ui_download_url": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-pingfang-only.zip"
     }
   }
 }
