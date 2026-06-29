@@ -40,7 +40,7 @@ jobs:
 
     steps:
       - name: 🔍 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.branch }}
@@ -97,7 +97,7 @@ jobs:
 
     steps:
       - name: 🔍 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.branch }}
@@ -338,7 +338,7 @@ jobs:
 
     steps:
       - name: 🔍 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.branch }}
@@ -418,7 +418,7 @@ jobs:
 
     steps:
       - name: 🔍 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.branch }}
@@ -524,7 +524,7 @@ jobs:
 
     steps:
       - name: 🔍 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.branch }}
@@ -610,7 +610,7 @@ jobs:
 
     steps:
       - name: 🔍 Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ inputs.repo }}
           ref: ${{ inputs.branch }}
