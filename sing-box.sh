@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# shellcheck disable=SC3043
+
 USE_PROCD=1
 START=99
 

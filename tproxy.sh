@@ -78,17 +78,17 @@ table inet $NFT_TABLE {
     type ipv6_addr
     flags interval
     elements = {
-      ::1/128,       # loopback（同上，fib local 通常覆盖，但保留更直观）
+      ::1/128,       # loopback
       fc00::/7,      # ULA
       fe80::/10      # link-local
     }
   }
 
   # -----------------------
-  # 可选：DIVERT（已透明 socket 的连接直接打 mark，避免重复处理）
+  # DIVERT（已透明 socket 的连接直接打 mark，避免重复处理）
   # -----------------------
   chain divert {
-    meta l4proto tcp socket transparent 1 meta mark set $PROXY_FWMARK counter accept
+    meta l4proto tcp socket transparent 1 meta mark set $PROXY_FWMARK accept
   }
 
   # -----------------------
@@ -107,7 +107,7 @@ table inet $NFT_TABLE {
     ip  daddr @byp4 return
     ip6 daddr @byp6 return
 
-    meta l4proto { tcp, udp } tproxy to :$PROXY_PORT meta mark set $PROXY_FWMARK counter accept comment "TProxy -> sing-box"
+    meta l4proto { tcp, udp } tproxy to :$PROXY_PORT meta mark set $PROXY_FWMARK accept
   }
 
   # -----------------------
@@ -126,7 +126,7 @@ table inet $NFT_TABLE {
     ip  daddr @byp4 return
     ip6 daddr @byp6 return
 
-    meta l4proto { tcp, udp } meta mark set $PROXY_FWMARK counter accept comment "Mark local-originated -> TProxy"
+    meta l4proto { tcp, udp } meta mark set $PROXY_FWMARK accept
   }
 }
 EOF
