@@ -1,21 +1,23 @@
 name: 🧪  CI Build
 
 on:
+  # 每周一 03:00 UTC（北京时间 11:00）
+  # reF1nd 的提交集中在周一至周五 10:00-18:00 CST，周一上午跑能覆盖上周五至周末的更新
+  schedule:
+    - cron: '0 3 * * 1'
   workflow_dispatch:
     inputs:
-      repo:
-        description: "Build repo"
+      target:
+        description: "构建目标 | official-stable=官方稳定 / official-testing=官方测试 / ref1nd-stable=改版稳定 / ref1nd-testing=改版测试"
         required: true
         type: choice
-        default: "reF1nd/sing-box"
+        default: "ref1nd-testing"
         options:
-          - reF1nd/sing-box
-          - SagerNet/sing-box
-      branch:
-        description: "Build branch"
-        required: true
-        type: string
-        default: "reF1nd-testing-next"
+          - official-stable
+          - official-testing
+          - ref1nd-stable
+          - ref1nd-testing
+
       build:
         description: "Build type"
         required: true
@@ -23,40 +25,137 @@ on:
         default: "Binary"
         options: [ Apps, Binary ]
 
+      # ===== 基础档位 =====
+      profile:
+        description: "Base profile | lean=仅当前配置所需(保底) / standard=全部非naive / full=官方默认"
+        required: true
+        type: choice
+        default: "lean"
+        options: [ lean, standard, full ]
+
+      # ===== 常用可选 tags（勾选即追加到 base 之上）=====
+      with_naive:
+        description: "with_naive_outbound | NaiveProxy 出站（需 Chromium toolchain，构建慢，矩阵扩到 6 项）"
+        required: false
+        type: boolean
+        default: false
+      with_cloudflared:
+        description: "with_cloudflared | Cloudflare Tunnel inbound"
+        required: false
+        type: boolean
+        default: false
+      with_tailscale:
+        description: "with_tailscale | Tailscale endpoint"
+        required: false
+        type: boolean
+        default: false
+      with_gvisor:
+        description: "with_gvisor | gVisor 栈（tun stack=gvisor/mixed 需要）"
+        required: false
+        type: boolean
+        default: false
+      with_dhcp:
+        description: "with_dhcp | DHCP DNS transport"
+        required: false
+        type: boolean
+        default: false
+      with_acme:
+        description: "with_acme | ACME 证书签发"
+        required: false
+        type: boolean
+        default: false
+
+      # ===== 兜底：其余 tags 手填，逗号分隔 =====
+      extra_tags:
+        description: "其余 tags 逗号分隔：with_grpc,with_openvpn,with_openconnect,with_usbip,with_ccm,with_ocm,with_v2ray_api,with_embedded_tor"
+        required: false
+        type: string
+        default: ""
+
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
+  group: ${{ github.workflow }}-${{ inputs.target || 'ref1nd-testing' }}-${{ inputs.build || 'Binary' }}
   cancel-in-progress: true
+
+env:
+  # lean：仅当前 sing-box.json 实际用到的功能
+  #   with_quic       DoQ / Hysteria / QUIC transport
+  #   with_wireguard  WARP endpoint
+  #   with_utls       VLESS Reality fingerprint
+  #   with_clash_api  面板 API
+  #   badlinkname + tfogo_checklinkname0  必须与 release/LDFLAGS 的 -checklinkname=0 配套
+  LEAN_BUILD_TAGS: >-
+    with_quic,with_wireguard,with_utls,with_clash_api,badlinkname,tfogo_checklinkname0
+  # standard：lean + 全部非 naive 功能（不含 with_naive_outbound）
+  STANDARD_BUILD_TAGS: >-
+    with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_ccm,with_ocm,with_cloudflared,with_usbip,with_openvpn,with_openconnect,badlinkname,tfogo_checklinkname0
 
 jobs:
   calculate_version:
     name: Calculate version
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: build
     outputs:
       version: ${{ steps.set_version.outputs.version }}
+      matrix_linux: ${{ steps.matrix.outputs.value }}
+      use_naive: ${{ steps.opts.outputs.use_naive }}
+      repo: ${{ steps.target.outputs.repo }}
+      branch: ${{ steps.target.outputs.branch }}
+      nightly: ${{ steps.target.outputs.nightly }}
+      base_tags: ${{ steps.opts.outputs.base }}
+      extra_tags: ${{ steps.opts.outputs.extra }}
 
     steps:
+      - name: 🎯 Resolve target
+        id: target
+        run: |
+          set -euo pipefail
+          # schedule 事件下 inputs 全为空，使用默认值
+          TARGET="${{ inputs.target || 'ref1nd-testing' }}"
+          case "$TARGET" in
+            official-stable)
+              REPO="SagerNet/sing-box"; BRANCH="stable";              NIGHTLY=false ;;
+            official-testing)
+              REPO="SagerNet/sing-box"; BRANCH="testing";             NIGHTLY=true  ;;
+            ref1nd-stable)
+              REPO="reF1nd/sing-box";   BRANCH="reF1nd-stable";       NIGHTLY=false ;;
+            ref1nd-testing)
+              REPO="reF1nd/sing-box";   BRANCH="reF1nd-testing-next"; NIGHTLY=true  ;;
+            *)
+              echo "::error::unknown target '${TARGET}'"; exit 1 ;;
+          esac
+          echo "repo=${REPO}"       >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}"   >> "$GITHUB_OUTPUT"
+          echo "nightly=${NIGHTLY}" >> "$GITHUB_OUTPUT"
+          echo "Target: ${REPO}@${BRANCH}  nightly=${NIGHTLY}"
+
       - name: 🔍 Checkout
         uses: actions/checkout@v7
         with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.branch }}
+          repository: ${{ steps.target.outputs.repo }}
+          ref: ${{ steps.target.outputs.branch }}
           fetch-depth: 0
 
       - name: 🔧 Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.x'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: 🧮 Calculate Version
         id: set_version
         run: |
           set -euo pipefail
-          output="$(go run ./cmd/internal/read_tag --ci --nightly 2>&1)"
+          extra=()
+          # nightly 由 target 决定：测试版走 nightly，稳定版走正式版号
+          if [[ "${{ needs.calculate_version.outputs.nightly }}" == "true" ]]; then
+            extra+=(--nightly)
+          fi
+          output="$(go run ./cmd/internal/read_tag --ci "${extra[@]}" 2>&1)"
           printf '%s\n' "$output"
           version=''
           while IFS= read -r line; do
@@ -78,36 +177,120 @@ jobs:
           echo "Calculated version: $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: 🧮 Resolve build options
+        id: opts
+        run: |
+          set -euo pipefail
+
+          # ---- base tags by profile ----
+          PROFILE="${{ inputs.profile || 'lean' }}"
+          case "$PROFILE" in
+            lean)     BASE="$LEAN_BUILD_TAGS" ;;
+            standard) BASE="$STANDARD_BUILD_TAGS" ;;
+            full)     BASE="" ;;   # 留空，由各平台读取 release/DEFAULT_BUILD_TAGS*
+            *) echo "::error::unknown profile"; exit 1 ;;
+          esac
+
+          EXTRA=""
+          add() {
+            local t="$1"
+            [[ -z "$t" ]] && return 0
+            case ",${EXTRA}," in
+              *",${t},"*) ;;
+              *) EXTRA="${EXTRA:+${EXTRA},}${t}" ;;
+            esac
+          }
+
+          # ---- feature toggles ----
+          if [[ "${{ inputs.with_naive }}"       == "true" ]]; then add with_naive_outbound; fi
+          if [[ "${{ inputs.with_cloudflared }}" == "true" ]]; then add with_cloudflared;   fi
+          if [[ "${{ inputs.with_tailscale }}"   == "true" ]]; then add with_tailscale;     fi
+          if [[ "${{ inputs.with_acme }}"        == "true" ]]; then add with_acme;          fi
+          if [[ "${{ inputs.with_gvisor }}"      == "true" ]]; then add with_gvisor;        fi
+          if [[ "${{ inputs.with_dhcp }}"        == "true" ]]; then add with_dhcp;          fi
+
+          # ---- extra tags ----
+          RAW="${{ inputs.extra_tags }}"
+          if [[ -n "$RAW" ]]; then
+            IFS=',' read -ra arr <<< "$RAW"
+            for t in "${arr[@]}"; do add "$(echo "$t" | xargs)"; done
+          fi
+
+          # naive 决定是否需要 Chromium toolchain
+          ALL="${BASE}${BASE:+,}${EXTRA}"
+          if [[ ",${ALL}," == *",with_naive_outbound,"* ]]; then
+            echo "use_naive=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_naive=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "base=${BASE}" >> "$GITHUB_OUTPUT"
+          echo "extra=${EXTRA}" >> "$GITHUB_OUTPUT"
+          echo "Resolved base: ${BASE:-<platform default>}  extra: ${EXTRA:-<none>}"
+
+      - name: 🧮 Calculate Linux matrix
+        id: matrix
+        run: |
+          set -euo pipefail
+          # OpenWrt 架构名映射（同一二进制按不同 Architecture 字段打包）
+          OW_AMD64="x86_64"
+          OW_ARM64="aarch64_cortex-a53 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic"
+
+          if [[ "${{ steps.opts.outputs.use_naive }}" == "true" ]]; then
+            # naive 需要 CGO + Chromium toolchain，仅官方支持的 amd64/arm64
+            value=$(cat <<EOF
+          [
+            {"os":"linux","arch":"amd64","variant":"purego","cgo":"0","naive":true},
+            {"os":"linux","arch":"arm64","variant":"purego","cgo":"0","naive":true},
+            {"os":"linux","arch":"amd64","variant":"glibc","cgo":"1","naive":true},
+            {"os":"linux","arch":"arm64","variant":"glibc","cgo":"1","naive":true},
+            {"os":"linux","arch":"amd64","variant":"musl","cgo":"1","naive":true,
+             "debian":"amd64","rpm":"x86_64","pacman":"x86_64","openwrt":"${OW_AMD64}"},
+            {"os":"linux","arch":"arm64","variant":"musl","cgo":"1","naive":true,
+             "debian":"arm64","rpm":"aarch64","pacman":"aarch64","openwrt":"${OW_ARM64}"}
+          ]
+          EOF
+          )
+          else
+            # 纯 Go 静态二进制：glibc / musl / OpenWrt 通吃
+            value=$(cat <<EOF
+          [
+            {"os":"linux","arch":"amd64","variant":"static","cgo":"0","naive":false,
+             "debian":"amd64","rpm":"x86_64","pacman":"x86_64","openwrt":"${OW_AMD64}"},
+            {"os":"linux","arch":"arm64","variant":"static","cgo":"0","naive":false,
+             "debian":"arm64","rpm":"aarch64","pacman":"aarch64","openwrt":"${OW_ARM64}"}
+          ]
+          EOF
+          )
+          fi
+          value="$(printf '%s' "$value" | tr -d '\n' | sed 's/  */ /g')"
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+
   build_linux:
-    name: Build Linux Binaries
-    if: inputs.build == 'Binary'
+    name: Linux ${{ matrix.arch }} ${{ matrix.variant }}
+    if: inputs.build == 'Binary' || github.event_name == 'schedule'
     needs: calculate_version
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment: build
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: linux, arch: amd64, variant: purego, naive: true }
-          - { os: linux, arch: arm64, variant: purego, naive: true }
-          - { os: linux, arch: amd64, variant: glibc, naive: true }
-          - { os: linux, arch: arm64, variant: glibc, naive: true }
-          - { os: linux, arch: amd64, variant: musl, naive: true, debian: amd64, rpm: x86_64, pacman: x86_64, openwrt: "x86_64" }
-          - { os: linux, arch: arm64, variant: musl, naive: true, debian: arm64, rpm: aarch64, pacman: aarch64, openwrt: "aarch64_cortex-a53 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic" }
+        include: ${{ fromJSON(needs.calculate_version.outputs.matrix_linux) }}
 
     steps:
       - name: 🔍 Checkout
         uses: actions/checkout@v7
         with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.branch }}
-          fetch-depth: 0
+          repository: ${{ needs.calculate_version.outputs.repo }}
+          ref: ${{ needs.calculate_version.outputs.branch }}
 
       - name: 🔧 Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.x'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: 📩 Clone cronet-go
         if: matrix.naive
@@ -116,7 +299,9 @@ jobs:
           CRONET_GO_VERSION=$(cat .github/CRONET_GO_VERSION)
           git init ~/cronet-go
           git -C ~/cronet-go remote add origin https://github.com/sagernet/cronet-go.git
-          git -C ~/cronet-go fetch --depth=1 origin "$CRONET_GO_VERSION"
+          # 跳过 /lib 目录（预编译产物），配合 blob:none 只拉必要对象
+          git -C ~/cronet-go sparse-checkout set --no-cone '/*' '!/lib'
+          git -C ~/cronet-go fetch --depth=1 --filter=blob:none origin "$CRONET_GO_VERSION"
           git -C ~/cronet-go checkout FETCH_HEAD
           git -C ~/cronet-go submodule update --init --recursive --depth=1
 
@@ -165,10 +350,20 @@ jobs:
       - name: 🔧 Set build tags
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.naive }}" == "true" ]]; then
-            TAGS=$(cat release/DEFAULT_BUILD_TAGS)
-          else
-            TAGS=$(cat release/DEFAULT_BUILD_TAGS_OTHERS)
+          TAGS="${{ needs.calculate_version.outputs.base_tags }}"
+          if [[ -z "${TAGS}" ]]; then
+            if [[ "${{ matrix.naive }}" == "true" ]]; then
+              TAGS=$(cat release/DEFAULT_BUILD_TAGS)
+            else
+              TAGS=$(cat release/DEFAULT_BUILD_TAGS_OTHERS)
+            fi
+          fi
+          EXTRA="${{ needs.calculate_version.outputs.extra_tags }}"
+          if [[ -n "${EXTRA}" ]]; then
+            IFS=',' read -ra ex <<< "$EXTRA"
+            for t in "${ex[@]}"; do
+              case ",${TAGS}," in *",${t},"*) ;; *) TAGS="${TAGS:+${TAGS},}${t}" ;; esac
+            done
           fi
           if [[ "${{ matrix.variant }}" == "purego" ]]; then
             TAGS="${TAGS},with_purego"
@@ -176,17 +371,20 @@ jobs:
             TAGS="${TAGS},with_musl"
           fi
           echo "BUILD_TAGS=${TAGS}" >> "$GITHUB_ENV"
+          echo "Build tags: ${TAGS}"
 
       - name: 🔧 Set shared ldflags
         run: |
           echo "LDFLAGS_SHARED=$(cat release/LDFLAGS)" >> "$GITHUB_ENV"
 
-      - name: 🔨 Build (purego)
-        if: matrix.variant == 'purego'
+      - name: 🔨 Build
         env:
-          CGO_ENABLED: "0"
+          CGO_ENABLED: ${{ matrix.cgo }}
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
+          GOARM: ${{ matrix.goarm }}
+          GOMIPS: ${{ matrix.gomips }}
+          GOMIPS64: ${{ matrix.gomips }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -194,34 +392,9 @@ jobs:
           go build -v -trimpath -o dist/sing-box -tags "$BUILD_TAGS" \
           -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' $LDFLAGS_SHARED -s -w -buildid=" \
           ./cmd/sing-box
-
-      - name: 🔨 Build (glibc)
-        if: matrix.variant == 'glibc'
-        env:
-          CGO_ENABLED: "1"
-          GOOS: ${{ matrix.os }}
-          GOARCH: ${{ matrix.arch }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          go build -v -trimpath -o dist/sing-box -tags "$BUILD_TAGS" \
-          -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' $LDFLAGS_SHARED -s -w -buildid=" \
-          ./cmd/sing-box
-
-      - name: 🔨 Build (musl)
-        if: matrix.variant == 'musl'
-        env:
-          CGO_ENABLED: "1"
-          GOOS: ${{ matrix.os }}
-          GOARCH: ${{ matrix.arch }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          go build -v -trimpath -o dist/sing-box -tags "$BUILD_TAGS" \
-          -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' $LDFLAGS_SHARED -s -w -buildid=" \
-          ./cmd/sing-box
+          file dist/sing-box
+          # 可复现构建：固定 mtime，使同一 commit 产物哈希稳定
+          TZ=UTC touch -t '197001010000' dist/sing-box
 
       - name: 🧩 Extract libcronet.so
         if: matrix.naive && matrix.variant == 'purego'
@@ -234,59 +407,62 @@ jobs:
       - name: 🔧 Set name
         run: |
           set -euo pipefail
-          DIR_NAME="sing-box_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${{ matrix.arch }}_${{ matrix.variant }}"
-          ARTIFACT_NAME="binary_${{ matrix.os }}_${{ matrix.arch }}_${{ matrix.variant }}"
+          ARCH_SUFFIX="${{ matrix.arch }}"
+          if [[ -n "${{ matrix.goarm }}" ]]; then ARCH_SUFFIX="${ARCH_SUFFIX}v${{ matrix.goarm }}"; fi
+          echo "ARCH_SUFFIX=${ARCH_SUFFIX}" >> "$GITHUB_ENV"
+          DIR_NAME="sing-box_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${ARCH_SUFFIX}_${{ matrix.variant }}"
+          ARTIFACT_NAME="binary_${{ matrix.os }}_${ARCH_SUFFIX}_${{ matrix.variant }}"
           PKG_VERSION="${{ needs.calculate_version.outputs.version }}"
           PKG_VERSION="${PKG_VERSION//-/\~}"
           echo "DIR_NAME=${DIR_NAME}" >> "$GITHUB_ENV"
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "$GITHUB_ENV"
           echo "PKG_VERSION=${PKG_VERSION}" >> "$GITHUB_ENV"
 
-      - name: 📦 Package DEB
-        if: matrix.debian != ''
+      - name: 📦 Install packaging tools
+        if: matrix.debian || matrix.rpm || matrix.pacman || matrix.openwrt
         run: |
           set -euo pipefail
-          sudo gem install fpm
           sudo apt-get update
-          sudo apt-get install -y debsigs
+          sudo apt-get install -y debsigs libarchive-tools
+          sudo gem install fpm
+
+      - name: 📦 Package DEB
+        if: matrix.debian
+        run: |
+          set -euo pipefail
           cp .fpm_systemd .fpm
           fpm -t deb \
             -v "$PKG_VERSION" \
-            -p "dist/sing-box_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${{ matrix.debian }}.deb" \
+            -p "dist/sing-box_${{ needs.calculate_version.outputs.version }}_${ARCH_SUFFIX}_${{ matrix.debian }}.deb" \
             --architecture ${{ matrix.debian }} \
             dist/sing-box=/usr/bin/sing-box
 
       - name: 📦 Package RPM
-        if: matrix.rpm != ''
+        if: matrix.rpm
         run: |
           set -euo pipefail
-          sudo gem install fpm
           cp .fpm_systemd .fpm
           fpm -t rpm \
             -v "$PKG_VERSION" \
-            -p "dist/sing-box_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${{ matrix.rpm }}.rpm" \
+            -p "dist/sing-box_${{ needs.calculate_version.outputs.version }}_${ARCH_SUFFIX}_${{ matrix.rpm }}.rpm" \
             --architecture ${{ matrix.rpm }} \
             dist/sing-box=/usr/bin/sing-box
 
       - name: 📦 Package Pacman
-        if: matrix.pacman != ''
+        if: matrix.pacman
         run: |
           set -euo pipefail
-          sudo gem install fpm
-          sudo apt-get update
-          sudo apt-get install -y libarchive-tools
           cp .fpm_pacman .fpm
           fpm -t pacman \
             -v "$PKG_VERSION" \
-            -p "dist/sing-box_${{ needs.calculate_version.outputs.version }}_${{ matrix.os }}_${{ matrix.pacman }}.pkg.tar.zst" \
+            -p "dist/sing-box_${{ needs.calculate_version.outputs.version }}_${ARCH_SUFFIX}_${{ matrix.pacman }}.pkg.tar.zst" \
             --architecture ${{ matrix.pacman }} \
             dist/sing-box=/usr/bin/sing-box
 
       - name: 📦 Package OpenWrt
-        if: matrix.openwrt != ''
+        if: matrix.openwrt
         run: |
           set -euo pipefail
-          sudo gem install fpm
           cp .fpm_openwrt .fpm
           fpm -t deb \
             -v "$PKG_VERSION" \
@@ -323,14 +499,17 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
 
   build_darwin:
-    name: Build Darwin Binaries
-    if: inputs.build == 'Binary'
+    name: Darwin ${{ matrix.arch }}
+    if: inputs.build == 'Binary' || github.event_name == 'schedule'
     needs: calculate_version
     runs-on: macos-latest
+    timeout-minutes: 120
     environment: build
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { os: darwin, arch: amd64 }
@@ -340,19 +519,32 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v7
         with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.branch }}
-          fetch-depth: 0
+          repository: ${{ needs.calculate_version.outputs.repo }}
+          ref: ${{ needs.calculate_version.outputs.branch }}
 
       - name: 🔧 Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.x'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
-      - name: 🔧 Set build tag
+      - name: 🔧 Set build tags
         run: |
-          echo "BUILD_TAGS=$(cat release/DEFAULT_BUILD_TAGS)" >> "$GITHUB_ENV"
+          set -euo pipefail
+          TAGS="${{ needs.calculate_version.outputs.base_tags }}"
+          if [[ -z "${TAGS}" ]]; then
+            TAGS=$(cat release/DEFAULT_BUILD_TAGS)
+          fi
+          EXTRA="${{ needs.calculate_version.outputs.extra_tags }}"
+          if [[ -n "${EXTRA}" ]]; then
+            IFS=',' read -ra ex <<< "$EXTRA"
+            for t in "${ex[@]}"; do
+              case ",${TAGS}," in *",${t},"*) ;; *) TAGS="${TAGS:+${TAGS},}${t}" ;; esac
+            done
+          fi
+          echo "BUILD_TAGS=${TAGS}" >> "$GITHUB_ENV"
+          echo "Build tags: ${TAGS}"
 
       - name: 🔧 Set shared ldflags
         run: |
@@ -360,16 +552,23 @@ jobs:
 
       - name: 🔨 Build
         env:
-          CGO_ENABLED: "1"
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          if [[ "${{ inputs.profile }}" == "lean" ]]; then
+            export CGO_ENABLED=0
+          else
+            export CGO_ENABLED=1
+          fi
           mkdir -p dist
           go build -v -trimpath -o dist/sing-box -tags "$BUILD_TAGS" \
           -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' $LDFLAGS_SHARED -s -w -buildid=" \
           ./cmd/sing-box
+          file dist/sing-box
+          # 可复现构建：固定 mtime，使同一 commit 产物哈希稳定
+          TZ=UTC touch -t '197001010000' dist/sing-box
 
       - name: 🔧 Set name
         run: |
@@ -400,56 +599,68 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
 
   build_windows:
-    name: Build Windows Binaries
-    if: inputs.build == 'Binary'
+    name: Windows ${{ matrix.arch }}
+    if: inputs.build == 'Binary' || github.event_name == 'schedule'
     needs: calculate_version
     runs-on: windows-latest
+    timeout-minutes: 120
     environment: build
     defaults:
       run:
         shell: bash
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - { os: windows, arch: amd64, naive: true }
-          - { os: windows, arch: arm64, naive: true }
+          - { os: windows, arch: amd64 }
+          - { os: windows, arch: arm64 }
 
     steps:
       - name: 🔍 Checkout
         uses: actions/checkout@v7
         with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.branch }}
-          fetch-depth: 0
+          repository: ${{ needs.calculate_version.outputs.repo }}
+          ref: ${{ needs.calculate_version.outputs.branch }}
 
       - name: 🔧 Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.x'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: 📩 Clone cronet-go
-        if: matrix.naive
+        if: needs.calculate_version.outputs.use_naive == 'true'
         run: |
           set -xeuo pipefail
           CRONET_GO_VERSION=$(cat .github/CRONET_GO_VERSION)
           git init ~/cronet-go
           git -C ~/cronet-go remote add origin https://github.com/sagernet/cronet-go.git
-          git -C ~/cronet-go fetch --depth=1 origin "$CRONET_GO_VERSION"
+          # 跳过 /lib 目录（预编译产物），配合 blob:none 只拉必要对象
+          git -C ~/cronet-go sparse-checkout set --no-cone '/*' '!/lib'
+          git -C ~/cronet-go fetch --depth=1 --filter=blob:none origin "$CRONET_GO_VERSION"
           git -C ~/cronet-go checkout FETCH_HEAD
           git -C ~/cronet-go submodule update --init --recursive --depth=1
 
       - name: 🔧 Set build tags
         run: |
           set -euo pipefail
-          if [[ "${{ matrix.naive }}" == "true" ]]; then
+          TAGS="${{ needs.calculate_version.outputs.base_tags }}"
+          if [[ -z "${TAGS}" ]]; then
             TAGS=$(cat release/DEFAULT_BUILD_TAGS_WINDOWS)
-          else
-            TAGS=$(cat release/DEFAULT_BUILD_TAGS_OTHERS)
+          fi
+          EXTRA="${{ needs.calculate_version.outputs.extra_tags }}"
+          if [[ -n "${EXTRA}" ]]; then
+            IFS=',' read -ra ex <<< "$EXTRA"
+            for t in "${ex[@]}"; do
+              case ",${TAGS}," in *",${t},"*) ;; *) TAGS="${TAGS:+${TAGS},}${t}" ;; esac
+            done
           fi
           echo "BUILD_TAGS=${TAGS}" >> "$GITHUB_ENV"
+          echo "Build tags: ${TAGS}"
 
       - name: 🔧 Set shared ldflags
         run: |
@@ -467,9 +678,11 @@ jobs:
           go build -v -trimpath -o dist/sing-box.exe -tags "$BUILD_TAGS" \
           -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' $LDFLAGS_SHARED -s -w -buildid=" \
           ./cmd/sing-box
+          TZ=UTC touch -t '197001010000' dist/sing-box.exe
+          ls -l dist/
 
       - name: 🧩 Extract libcronet.dll
-        if: matrix.naive
+        if: needs.calculate_version.outputs.use_naive == 'true'
         env:
           CGO_ENABLED: "0"
         run: |
@@ -489,7 +702,7 @@ jobs:
           set -euo pipefail
           cd dist && mkdir -p "$DIR_NAME"
           cp ../LICENSE "$DIR_NAME"
-          cp sing-box "$DIR_NAME"
+          cp sing-box.exe "$DIR_NAME"
           if [ -f libcronet.dll ]; then
             cp libcronet.dll "$DIR_NAME"
           fi
@@ -509,14 +722,17 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
 
   build_android:
-    name: Build Android Binaries
-    if: inputs.build == 'Binary'
+    name: Android ${{ matrix.arch }}
+    if: inputs.build == 'Binary' || github.event_name == 'schedule'
     needs: calculate_version
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     environment: build
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { os: android, arch: arm64, ndk: "aarch64-linux-android23" }
@@ -526,15 +742,15 @@ jobs:
       - name: 🔍 Checkout
         uses: actions/checkout@v7
         with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.branch }}
-          fetch-depth: 0
+          repository: ${{ needs.calculate_version.outputs.repo }}
+          ref: ${{ needs.calculate_version.outputs.branch }}
 
       - name: 🔧 Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.x'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: 🔧 Setup NDK
         uses: nttld/setup-ndk@v1
@@ -544,7 +760,20 @@ jobs:
 
       - name: 🔧 Set build tags
         run: |
-          echo "BUILD_TAGS=$(cat release/DEFAULT_BUILD_TAGS_OTHERS)" >> "$GITHUB_ENV"
+          set -euo pipefail
+          TAGS="${{ needs.calculate_version.outputs.base_tags }}"
+          if [[ -z "${TAGS}" ]]; then
+            TAGS=$(cat release/DEFAULT_BUILD_TAGS_OTHERS)
+          fi
+          EXTRA="${{ needs.calculate_version.outputs.extra_tags }}"
+          if [[ -n "${EXTRA}" ]]; then
+            IFS=',' read -ra ex <<< "$EXTRA"
+            for t in "${ex[@]}"; do
+              case ",${TAGS}," in *",${t},"*) ;; *) TAGS="${TAGS:+${TAGS},}${t}" ;; esac
+            done
+          fi
+          echo "BUILD_TAGS=${TAGS}" >> "$GITHUB_ENV"
+          echo "Build tags: ${TAGS}"
 
       - name: 🔧 Set shared ldflags
         run: |
@@ -565,17 +794,15 @@ jobs:
           GOOS=$BUILD_GOOS GOARCH=$BUILD_GOARCH build go build -v -trimpath -o dist/sing-box -tags "$BUILD_TAGS" \
           -ldflags "-X 'github.com/sagernet/sing-box/constant.Version=${{ needs.calculate_version.outputs.version }}' $LDFLAGS_SHARED -s -w -buildid=" \
           ./cmd/sing-box
+          TZ=UTC touch -t '197001010000' dist/sing-box
 
       - name: 🔧 Set name
         run: |
           set -euo pipefail
           DIR_NAME="sing-box-${{ needs.calculate_version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}"
           ARTIFACT_NAME="binary_${{ matrix.os }}_${{ matrix.arch }}"
-          PKG_VERSION="${{ needs.calculate_version.outputs.version }}"
-          PKG_VERSION="${PKG_VERSION//-/\~}"
           echo "DIR_NAME=${DIR_NAME}" >> "$GITHUB_ENV"
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "$GITHUB_ENV"
-          echo "PKG_VERSION=${PKG_VERSION}" >> "$GITHUB_ENV"
 
       - name: 🗜️ Archive
         run: |
@@ -598,30 +825,34 @@ jobs:
           path: dist
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
 
   build_apps:
     name: Build Android APKs
-    if: inputs.build == 'Apps'
+    if: inputs.build == 'Apps' && github.event_name != 'schedule'
     needs: calculate_version
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment: build
     env:
-      TARGET_BRANCH: ${{ contains(github.ref_name || github.head_ref, 'testing') && 'dev' || 'main' }}
+      # 依据所选核心分支决定客户端分支，而不是本仓库 ref
+      TARGET_BRANCH: ${{ contains(inputs.target, 'testing') && 'dev' || 'main' }}
 
     steps:
       - name: 🔍 Checkout
         uses: actions/checkout@v7
         with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.branch }}
+          repository: ${{ needs.calculate_version.outputs.repo }}
+          ref: ${{ needs.calculate_version.outputs.branch }}
           fetch-depth: 0
           submodules: 'recursive'
 
       - name: 🔧 Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.25.x'
+          go-version-file: go.mod
           cache: true
+          cache-dependency-path: go.sum
 
       - name: 🔧 Setup NDK
         id: setup-ndk
@@ -631,13 +862,15 @@ jobs:
           local-cache: true
 
       - name: 🔧 Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: 🔧 Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
 
       - name: 🔨 Build library
         env:
@@ -650,33 +883,48 @@ jobs:
       - name: 🔍 Checkout target branch
         run: |
           cd clients/android
-          git checkout $TARGET_BRANCH
+          git checkout "$TARGET_BRANCH"
 
-      - name: 🧮 Update version (manual dispatch)
-        if: github.event_name == 'workflow_dispatch'
+      # clients/android 是外部 submodule，无法在本仓库内改文件，
+      # 因此在 checkout 之后覆盖 release.keystore 并注入签名参数。
+      # 两个 secret 都未配置时保留仓库自带的 keystore（仅调试用）。
+      - name: 🔑 Inject signing material
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PROPS_B64: ${{ secrets.ANDROID_LOCAL_PROPERTIES_BASE64 }}
         run: |
-          go run -v ./cmd/internal/update_android_version --ci
+          set -euo pipefail
+          if [[ -z "${KEYSTORE_B64}" || -z "${PROPS_B64}" ]]; then
+            echo "::error::需要同时配置 ANDROID_KEYSTORE_BASE64 与 ANDROID_LOCAL_PROPERTIES_BASE64"
+            exit 1
+          fi
+          printf '%s' "${KEYSTORE_B64}" | base64 -d > clients/android/app/release.keystore
+          printf '%s' "${PROPS_B64}" | base64 -d > clients/android/local.properties
+          # JKS=feedfeed  PKCS12=3082（DER SEQUENCE）
+          magic=$(od -An -tx1 -N2 clients/android/app/release.keystore | tr -d ' \n')
+          [[ "$magic" == "feed" || "$magic" == "3082" ]] || { echo "::error::keystore 非 JKS/PKCS12（magic=$magic）"; exit 1; }
+          for k in KEYSTORE_PASS ALIAS_NAME ALIAS_PASS; do
+            grep -q "^$k=" clients/android/local.properties || { echo "::error::properties 缺少 $k"; exit 1; }
+          done
 
-      - name: 🧮 Update nightly version (non dispatch)
-        if: github.event_name != 'workflow_dispatch'
+      - name: 🧮 Update version
         run: |
-          go run -v ./cmd/internal/update_android_version --ci --nightly
+          set -euo pipefail
+          extra=()
+          # nightly 由 target 决定：测试版走 nightly，稳定版走正式版号
+          if [[ "${{ needs.calculate_version.outputs.nightly }}" == "true" ]]; then
+            extra+=(--nightly)
+          fi
+          go run -v ./cmd/internal/update_android_version --ci "${extra[@]}"
 
       - name: 🔨 Build APKs
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-          LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
         run: |
           mkdir -p clients/android/app/libs
           cp *.aar clients/android/app/libs
           cd clients/android
-          ./gradlew :app:assembleOtherRelease :app:assembleOtherLegacyRelease
-
-      - name: 🔧 Set name
-        run: |
-          set -euo pipefail
-          ARTIFACT_NAME="binary_android_apks"
-          echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "$GITHUB_ENV"
+          ./gradlew --build-cache --parallel :app:assembleOtherRelease :app:assembleOtherLegacyRelease
 
       - name: 📤 Prepare upload
         run: |
@@ -697,7 +945,8 @@ jobs:
       - name: 📤 Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_NAME }}
+          name: binary_android_apks
           path: dist
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0

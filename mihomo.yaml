@@ -1,0 +1,398 @@
+# mihomo / Clash.Meta 配置
+# 分流语义与规则集完全对齐仓库根目录 sing-box.json
+# 规则集来源：MetaCubeX/meta-rules-dat（meta 分支 .mrs 二进制格式）
+# 下方 route.rules[N] 的下标与 sing-box.json 的 route.rules 数组下标一一对应
+# （[0] sniff、[1] hijack-dns 在 mihomo 侧由 sniffer / dns 配置承担，不占规则行）
+
+ipv6: false
+mixed-port: 7890
+# tproxy 透明代理端口（Linux/Android 专属），与 sing-box.json 的 tproxy-in 一致
+# 需配合 tproxy.sh 使用：NFT_TABLE=mihomo PROXY_PORT=12345 ./tproxy.sh start
+tproxy-port: 12345
+# mihomo 自身出站流量的 mark，供 tproxy.sh 的 OUTPUT 链放行，避免回环
+# 与 sing-box 的 route.default_mark 同值
+routing-mark: 255
+allow-lan: true
+unified-delay: true
+tcp-concurrent: true
+find-process-mode: strict
+global-client-fingerprint: chrome
+
+keep-alive-idle: 600
+keep-alive-interval: 15
+disable-keep-alive: false
+
+geo-auto-update: true
+geodata-mode: false
+geox-url:
+  mmdb: 'https://geodata.kelee.one/Country-Masaiki.mmdb'
+  asn: 'https://geodata.kelee.one/GeoLite2-ASN-P3TERX.mmdb'
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+# 仅监听回环；需要局域网访问面板时改为 :9090 并设置 secret
+external-controller: :9090
+# 与 sing-box 的 experimental.clash_api 使用同一个面板
+external-ui: ui
+external-ui-url: 'https://github.com/Zephyruso/zashboard/releases/latest/download/dist-pingfang-only.zip'
+
+dns:
+  enable: true
+  listen: :1053
+  ipv6: false
+  prefer-h3: true
+  respect-rules: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.0/16
+  fake-ip-filter-mode: blacklist
+  cache-size: 2048
+  cache-algorithm: arc
+
+  use-hosts: false
+  use-system-hosts: false
+
+  fake-ip-filter:
+    - '*.lan'
+    - '*.local'
+    - '*.localdomain'
+    - '*.internal'
+    - '*.home.arpa'
+    - 'localhost.ptlogin2.qq.com'
+    - '+.msftconnecttest.com'
+    - '+.msftncsi.com'
+    - 'time.windows.com'
+    - 'time.*.com'
+    - '+.pool.ntp.org'
+    - '+.ntp.org'
+    - 'stun.*'
+    - '+.stunprotocol.org'
+    # 局域网互传 / 语音需要真实解析
+    - '+.weixin.qq.com'
+    - '+.battlenet.com.cn'
+
+  # 仅用于解析 DoH/DoT 服务器域名，必须是纯 IP
+  default-nameserver:
+    - 223.5.5.5
+    - 119.29.29.29
+
+  # 节点域名解析，避免节点走代理造成环路
+  proxy-server-nameserver:
+    - https://223.5.5.5/dns-query
+    - https://doh.pub/dns-query
+
+  # 默认走国内（sing-box 的 evaluate → local）
+  nameserver:
+    - https://223.5.5.5/dns-query
+    - https://doh.pub/dns-query
+    - https://120.53.53.53/dns-query
+    - 223.5.5.5
+    - 119.29.29.29
+
+  # 对齐 sing-box dns.rules：
+  #   private / geosite-cn → local
+  #   geolocation-!cn      → global（经代理）
+  nameserver-policy:
+    'rule-set:Private,GeositeCN':
+      - https://223.5.5.5/dns-query
+      - 223.5.5.5
+    'rule-set:GeolocationNotCN':
+      - https://1.1.1.1/dns-query#Available
+      - https://dns.google/dns-query#Available
+    'rule-set:AI':
+      - https://1.1.1.1/dns-query#Available
+      - https://dns.google/dns-query#Available
+    'rule-set:Google':
+      - https://1.1.1.1/dns-query#Available
+      - https://dns.google/dns-query#Available
+
+tun:
+  enable: true
+  # mihomo 自研栈，较 mixed 更省内存；如遇兼容问题改回 mixed
+  stack: mips
+  auto-route: true
+  auto-redirect: true
+  strict-route: true
+  auto-detect-interface: true
+
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+
+  mtu: 1480
+  gso: true
+  gso-max-size: 65536
+  udp-timeout: 300
+
+  # 原 tun-excluded-routes 不是 mihomo 的合法顶层键，应写在这里
+  route-exclude-address:
+    - 224.0.0.0/3
+    - 239.255.255.250/32
+    - 255.255.255.255/32
+
+sniffer:
+  enable: true
+  sniff:
+    HTTP:
+      ports: [ '80', 8080-8880 ]
+      override-destination: true
+    TLS:
+      ports: [ 443, 8443 ]
+      override-destination: true
+    QUIC:
+      ports: [ 443, 8443 ]
+      override-destination: true
+
+  # 强制嗅探，防止 fake-ip 下域名丢失
+  force-domain:
+    - '+.v2ex.com'
+    - '+.youtube.com'
+    - '+.googlevideo.com'
+    - '+.spotify.com'
+    - '+.telegram.org'
+    - '+.twitch.tv'
+
+  # 禁止嗅探，避免推送 / 局域网异常
+  skip-domain:
+    - 'Mijia Cloud'
+    - '+.push.apple.com'
+    - '+.icloud.com'
+    - '+.local'
+    - '+.lan'
+    - 'localhost'
+
+# 静态出站。私钥留空：公开参考不放凭据，自用时填入自己的 WARP private_key
+proxies:
+  - name: WARP
+    type: wireguard
+    server: ''
+    port: 2408
+    ip: ''
+    ipv6: ''
+    private-key: ''
+    public-key: ''
+    reserved: [ 0, 0, 0 ]
+    udp: true
+    mtu: 1280
+    # 对齐 sing-box endpoints.WARP 的 detour: Available
+    dialer-proxy: Available
+    remote-dns-resolve: true
+    dns: [ 1.1.1.1 ]
+
+proxy-providers:
+  firefly:
+    type: http
+    udp: true
+    interval: 86400
+    proxy: DIRECT
+    lazy: true
+    url: 'https://sub.store/download/Firefly'
+    health-check:
+      enable: true
+      url: https://cp.cloudflare.com/generate_204
+      interval: 600
+      timeout: 5
+      lazy: true
+      expected-status: '204'
+      method: HEAD
+    smux:
+      enabled: true
+      padding: true
+      protocol: smux
+
+proxy-groups:
+  # sing-box: selector Available [Auto, HK, TW, JP, KR, US, SG, EU, Direct]
+  - name: Available
+    type: select
+    proxies: [ Auto, Static, HK, TW, JP, KR, US, SG, EU, DIRECT ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Available.png'
+
+  - name: Static
+    type: select
+    include-all: true
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Static.png'
+
+  # sing-box: selector AI [WARP, US, SG, JP, HK, TW, KR, EU, Available]，默认 WARP
+  - name: AI
+    type: select
+    proxies: [ WARP, US, SG, JP, HK, TW, KR, EU, Available ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/AI.png'
+
+  # sing-box: selector Google [WARP, US, SG, JP, HK, TW, KR, EU, Available]，默认 WARP
+  - name: Google
+    type: select
+    proxies: [ WARP, US, SG, JP, HK, TW, KR, EU, Available ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Google_Search.png'
+
+  # sing-box: selector Media，默认 US
+  - name: Media
+    type: select
+    proxies: [ Available, US, SG, JP, HK, TW, KR, EU ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Media.png'
+
+  # sing-box: selector TikTok，默认 SG
+  - name: TikTok
+    type: select
+    proxies: [ Available, US, SG, JP, HK, TW, KR, EU ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/TikTok.png'
+
+  # sing-box: selector Spotify，默认 US
+  - name: Spotify
+    type: select
+    proxies: [ Available, US, SG, JP, HK, TW, KR, EU ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Spotify.png'
+
+  # sing-box: selector Bypass [Direct, Available]
+  - name: Bypass
+    type: select
+    proxies: [ DIRECT, Available, HK, TW, JP, KR, US, SG, EU ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Bypass.png'
+
+  # sing-box: route.final = Available
+  - name: Final
+    type: select
+    proxies: [ Available, DIRECT ]
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Final.png'
+
+  - name: Auto
+    <<: &test
+      type: url-test
+      url: https://www.gstatic.com/generate_204
+      include-all: true
+      tolerance: 50
+      interval: 600
+    lazy: false
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Auto.png'
+
+  - name: HK
+    <<: *test
+    filter: '(?i)(🇭🇰|香港|港|HK|Hong)'
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Hong_Kong.png'
+
+  - name: TW
+    <<: *test
+    filter: '(?i)(🇹🇼|台湾|台灣|台|TW|Tai)'
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Taiwan.png'
+
+  - name: JP
+    <<: *test
+    filter: '(?i)(🇯🇵|日本|川日|东京|東京|大阪|泉日|埼玉|沪日|深日|JP|Japan)'
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Japan.png'
+
+  - name: KR
+    <<: *test
+    filter: '(?i)(🇰🇷|韩国|韓国|韓國|首尔|首爾|韩|韓|KR|KOR|Korea)'
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Korea.png'
+
+  - name: US
+    <<: *test
+    filter: '(?i)(🇺🇸|美国|美國|美西|美东|美東|波特兰|波特蘭|达拉斯|達拉斯|俄勒冈|俄勒岡|凤凰城|鳳凰城|费利蒙|硅谷|矽谷|拉斯维加斯|拉斯維加斯|洛杉矶|洛杉磯|圣何塞|聖何塞|圣克拉拉|西雅图|西雅圖|芝加哥|纽约|紐約|US|USA|United States)'
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/United_States.png'
+
+  - name: SG
+    <<: *test
+    filter: '(?i)(🇸🇬|新加坡|坡|狮城|獅城|SG|SGP|Singapore)'
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Singapore.png'
+
+  - name: EU
+    <<: *test
+    filter: '(?i)(🇩🇪|🇬🇧|🇫🇷|🇳🇱|🇪🇺|德国|德國|法兰克福|法蘭克福|英国|英國|伦敦|倫敦|法国|法國|巴黎|荷兰|荷蘭|阿姆斯特丹|DE|DEU|Germany|Frankfurt|UK|GB|GBR|United Kingdom|Britain|London|FR|FRA|France|Paris|NL|NLD|Netherlands|Amsterdam)'
+    icon: 'https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/European_Union.png'
+
+rules:
+  # ---- sing-box route.rules[2]: udp/123 → Direct ----
+  - AND,((NETWORK,udp),(DST-PORT,123)),DIRECT
+
+  # ---- route.rules[3]: private + geoip-private → Direct ----
+  - RULE-SET,Private,DIRECT
+  - GEOIP,LAN,DIRECT,no-resolve
+
+  # ---- route.rules[4]: category-ads-all → reject ----
+  - RULE-SET,Ads,REJECT
+
+  # ---- route.rules[5]: DoT / STUN → reject ----
+  # udp/443 不在此拒绝：mihomo 的 sniffer 能解出 QUIC SNI，域名规则照常生效
+  - DST-PORT,853,REJECT
+  - DST-PORT,3478,REJECT
+
+  # ---- route.rules[6]: category-ai-!cn → AI ----
+  - RULE-SET,AI,AI
+
+  # ---- route.rules[7]: microsoft@cn + apple-cn + category-games@cn → Bypass ----
+  - RULE-SET,MicrosoftCN,Bypass
+  - RULE-SET,AppleCN,Bypass
+  - RULE-SET,GameCN,Bypass
+
+  # ---- route.rules[8]: google → Google ----
+  - RULE-SET,Google,Google
+
+  # ---- route.rules[9]: netflix + hbo + primevideo → Media ----
+  - RULE-SET,Netflix,Media
+  - RULE-SET,HBO,Media
+  - RULE-SET,PrimeVideo,Media
+
+  # ---- route.rules[10] / [11]: tiktok / spotify ----
+  - RULE-SET,TikTok,TikTok
+  - RULE-SET,Spotify,Spotify
+
+  # ---- route.rules[12]: geolocation-!cn → Available ----
+  - RULE-SET,GeolocationNotCN,Available
+
+  # ---- route.rules[13]: geosite-cn → Bypass ----
+  - RULE-SET,GeositeCN,Bypass
+
+  # ---- route.rules[14]: geoip-cn AND NOT geolocation-!cn → Bypass ----
+  # GeolocationNotCN 已在上方匹配，此处等价于 AND NOT !cn
+  - GEOIP,CN,Bypass,no-resolve
+
+  # ---- sing-box route.final = Available ----
+  - MATCH,Final
+
+rule-providers:
+  Private:
+    <<: &mrs
+      type: http
+      behavior: domain
+      format: mrs
+      interval: 86400
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.mrs'
+  Ads:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs'
+  GeolocationNotCN:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/geolocation-!cn.mrs'
+  AI:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-!cn.mrs'
+  MicrosoftCN:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/microsoft@cn.mrs'
+  AppleCN:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/apple-cn.mrs'
+  GameCN:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-games@cn.mrs'
+  Google:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google.mrs'
+  Netflix:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.mrs'
+  HBO:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/hbo.mrs'
+  PrimeVideo:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/primevideo.mrs'
+  TikTok:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/tiktok.mrs'
+  Spotify:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/spotify.mrs'
+  GeositeCN:
+    <<: *mrs
+    url: 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs'

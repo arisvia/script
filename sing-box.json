@@ -1,6 +1,6 @@
 {
   "log": {
-    "level": "warn",
+    "level": "info",
     "timestamp": true
   },
   "dns": {
@@ -12,7 +12,7 @@
         "server": "8.8.8.8"
       },
       {
-        "type": "quic",
+        "type": "https",
         "tag": "local",
         "server": "223.5.5.5"
       },
@@ -66,7 +66,8 @@
       {
         "server": "global"
       }
-    ]
+    ],
+    "strategy": "ipv4_only"
   },
   "http_clients": [
     {
@@ -76,11 +77,28 @@
       "connection_receive_window": 0
     }
   ],
-  "providers": [
+  "endpoints": [
     {
-      "type": "remote",
-      "tag": "Cyrene",
-      "url": "https://sub.store/download/Firefly"
+      "type": "wireguard",
+      "tag": "WARP",
+      "system": false,
+      "mtu": 1280,
+      "address": [
+      ],
+      "private_key": "",
+      "peers": [
+        {
+          "address": "",
+          "port": 2408,
+          "public_key": "",
+          "allowed_ips": [
+            "0.0.0.0/0",
+            "::/0"
+          ],
+          "persistent_keepalive_interval": 30
+        }
+      ],
+      "detour": "Available"
     }
   ],
   "inbounds": [
@@ -89,9 +107,24 @@
       "tag": "tproxy-in",
       "listen": "::",
       "listen_port": 12345
+    },
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.18.0.1/30",
+        "fdfe:dcba:9876::1/126"
+      ],
+      "auto_route": true,
+      "strict_route": true,
+      "auto_redirect": true
     }
   ],
   "outbounds": [
+    {
+      "type": "direct",
+      "tag": "Direct"
+    },
     {
       "type": "selector",
       "tag": "Available",
@@ -109,160 +142,79 @@
       "use_all_providers": true
     },
     {
-      "type": "direct",
-      "tag": "Direct"
-    },
-    {
-      "type": "selector",
-      "tag": "Service",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "EU",
-        "Direct"
-      ],
-      "default": "Direct"
-    },
-    {
       "type": "selector",
       "tag": "AI",
       "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
+        "WARP",
         "US",
         "SG",
+        "JP",
+        "HK",
+        "TW",
+        "KR",
         "EU",
-        "Direct"
+        "Available"
       ]
     },
     {
       "type": "selector",
-      "tag": "Scholar",
+      "tag": "Google",
       "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
+        "WARP",
         "US",
         "SG",
+        "JP",
+        "HK",
+        "TW",
+        "KR",
         "EU",
-        "Direct"
+        "Available"
       ]
     },
     {
       "type": "selector",
-      "tag": "Telegram",
+      "tag": "Media",
       "outbounds": [
         "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
         "US",
         "SG",
-        "EU",
-        "Direct"
-      ]
-    },
-    {
-      "type": "selector",
-      "tag": "Twitter",
-      "outbounds": [
-        "Available",
+        "JP",
         "HK",
         "TW",
-        "JP",
         "KR",
-        "US",
-        "SG",
-        "EU",
-        "Direct"
-      ]
+        "EU"
+      ],
+      "default": "US"
     },
     {
       "type": "selector",
       "tag": "TikTok",
       "outbounds": [
         "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
         "US",
         "SG",
-        "EU",
-        "Direct"
-      ]
+        "JP",
+        "HK",
+        "TW",
+        "KR",
+        "EU"
+      ],
+      "default": "SG"
     },
     {
       "type": "selector",
       "tag": "Spotify",
       "outbounds": [
         "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
         "US",
         "SG",
-        "EU",
-        "Direct"
-      ]
-    },
-    {
-      "type": "selector",
-      "tag": "BiliIntl",
-      "outbounds": [
-        "Available",
+        "JP",
         "HK",
         "TW",
-        "JP",
         "KR",
-        "US",
-        "SG",
-        "EU",
-        "Direct"
+        "EU"
       ],
-      "default": "Direct"
-    },
-    {
-      "type": "selector",
-      "tag": "Netflix",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "EU",
-        "Direct"
-      ]
-    },
-    {
-      "type": "selector",
-      "tag": "YouTube",
-      "outbounds": [
-        "Available",
-        "HK",
-        "TW",
-        "JP",
-        "KR",
-        "US",
-        "SG",
-        "EU",
-        "Direct"
-      ]
+      "default": "US"
     },
     {
       "type": "selector",
@@ -276,7 +228,7 @@
       "type": "urltest",
       "tag": "Auto",
       "use_all_providers": true,
-      "url": "http://www.gstatic.com/generate_204",
+      "url": "https://www.gstatic.com/generate_204",
       "interval": "30m0s",
       "tolerance": 100
     },
@@ -344,6 +296,13 @@
       "tolerance": 80
     }
   ],
+  "providers": [
+    {
+      "type": "remote",
+      "tag": "Firefly",
+      "url": "https://sub.store/download/Firefly"
+    }
+  ],
   "route": {
     "rules": [
       {
@@ -361,6 +320,11 @@
           }
         ],
         "action": "hijack-dns"
+      },
+      {
+        "network": "udp",
+        "port": 123,
+        "outbound": "Direct"
       },
       {
         "rule_set": [
@@ -382,7 +346,8 @@
           },
           {
             "network": "udp",
-            "port": 443
+            "port": 443,
+            "rule_set": "geolocation-!cn"
           },
           {
             "protocol": "stun"
@@ -395,19 +360,24 @@
         "outbound": "AI"
       },
       {
-        "rule_set": "category-scholar-!cn",
-        "outbound": "Scholar"
+        "rule_set": [
+          "microsoft@cn",
+          "apple-cn",
+          "category-games@cn"
+        ],
+        "outbound": "Bypass"
+      },
+      {
+        "rule_set": "google",
+        "outbound": "Google"
       },
       {
         "rule_set": [
-          "telegram",
-          "geoip-telegram"
+          "netflix",
+          "hbo",
+          "primevideo"
         ],
-        "outbound": "Telegram"
-      },
-      {
-        "rule_set": "twitter",
-        "outbound": "Twitter"
+        "outbound": "Media"
       },
       {
         "rule_set": "tiktok",
@@ -416,26 +386,6 @@
       {
         "rule_set": "spotify",
         "outbound": "Spotify"
-      },
-      {
-        "rule_set": "biliintl",
-        "outbound": "BiliIntl"
-      },
-      {
-        "rule_set": "netflix",
-        "outbound": "Netflix"
-      },
-      {
-        "rule_set": "youtube",
-        "outbound": "YouTube"
-      },
-      {
-        "rule_set": [
-          "microsoft@cn",
-          "apple-cn",
-          "category-games@cn"
-        ],
-        "outbound": "Service"
       },
       {
         "rule_set": "geolocation-!cn",
@@ -468,8 +418,18 @@
       },
       {
         "type": "remote",
+        "tag": "geoip-private",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/private.srs"
+      },
+      {
+        "type": "remote",
         "tag": "category-ads-all",
         "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ads-all.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geolocation-!cn",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/geolocation-!cn.srs"
       },
       {
         "type": "remote",
@@ -478,43 +438,8 @@
       },
       {
         "type": "remote",
-        "tag": "category-scholar-!cn",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-scholar-!cn.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "telegram",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/telegram.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "twitter",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/twitter.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "tiktok",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/tiktok.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "spotify",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/spotify.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "biliintl",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/biliintl.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "netflix",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/netflix.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "youtube",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/youtube.srs"
+        "tag": "google",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/google.srs"
       },
       {
         "type": "remote",
@@ -533,23 +458,33 @@
       },
       {
         "type": "remote",
-        "tag": "geolocation-!cn",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/geolocation-!cn.srs"
+        "tag": "netflix",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/netflix.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "hbo",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/hbo.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "primevideo",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/primevideo.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "tiktok",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/tiktok.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "spotify",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/spotify.srs"
       },
       {
         "type": "remote",
         "tag": "geosite-cn",
         "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "geoip-private",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/private.srs"
-      },
-      {
-        "type": "remote",
-        "tag": "geoip-telegram",
-        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/telegram.srs"
       },
       {
         "type": "remote",
@@ -560,24 +495,18 @@
     "final": "Available",
     "auto_detect_interface": true,
     "default_mark": "0xff",
-    "default_domain_resolver": "global"
+    "default_domain_resolver": "local"
   },
-  "services": [
-    {
-      "type": "api",
-      "listen": "::",
-      "listen_port": 9090,
-      "dashboard": {
-        "enabled": true,
-        "download_url": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-pingfang-only.zip"
-      }
-    }
-  ],
   "experimental": {
     "cache_file": {
       "enabled": true,
       "store_fakeip": true,
       "store_dns": true
+    },
+    "clash_api": {
+      "external_controller": "[::]:9090",
+      "external_ui": "ui",
+      "external_ui_download_url": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-pingfang-only.zip"
     }
   }
 }

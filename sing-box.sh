@@ -3,19 +3,21 @@
 USE_PROCD=1
 START=99
 
-script=$(readlink "$initscript")
-NAME=$(basename "${script:-$initscript}")
+# 固定实例名：直接 `sh /etc/init.d/sing-box start` 时 $initscript 为空，
+# readlink 推导会得到 NAME="."，导致 config_load 失败。
+NAME=sing-box
 PROG=/usr/bin/sing-box
 
 CONF=/etc/sing-box/config.json
 WORKDIR=/usr/share/sing-box
 TPROXY=/etc/sing-box/tproxy.sh
+PROXY_PORT=12345   # 与 tproxy.sh 的 PROXY_PORT 保持一致
 
 start_service() {
   config_load "$NAME"
 
   local enabled user group conffile workdir ifaces tproxy
-  local log_stdout log_stderr
+  local log_stdout log_stderr port_hex i
   config_get_bool enabled "main" "enabled" "0"
   [ "$enabled" -eq "1" ] || return 0
 
@@ -35,6 +37,7 @@ start_service() {
   procd_set_param command "$PROG" run -c "$conffile" -D "$workdir"
 
   # Use root user if you want to use the TUN mode.
+  # tproxy 模式同样需要 root（IP_TRANSPARENT socket）。
   procd_set_param user "$user"
   procd_set_param file "$conffile"
   [ -z "$ifaces" ] || procd_set_param netdev "$ifaces"
@@ -46,17 +49,24 @@ start_service() {
 
   procd_close_instance
 
+  # 等 tproxy 端口就绪再挂规则，否则启动瞬间流量会被转到尚未监听的端口。
+  # 读 /proc/net/tcp{,6}（tproxy 监听 :: 为双栈），不依赖 ss/netstat。
+  port_hex=$(printf '%04X' "$PROXY_PORT")
+  i=0
+  while [ "$i" -lt 5 ] && ! grep -q ":${port_hex} " /proc/net/tcp /proc/net/tcp6 2>/dev/null; do
+    i=$((i + 1))
+    sleep 1
+  done
+
   echo "Loading NFTables rules..."
   sh "$tproxy" start
 }
 
 stop_service() {
+  # 不检查 enabled：即使服务已禁用，也必须清理已应用的 nft 规则与策略路由，
+  # 否则残留规则会把流量转发到已停止的端口，造成断网。
+  local tproxy
   config_load "$NAME"
-
-  local enabled tproxy
-  config_get_bool enabled "main" "enabled" "0"
-  [ "$enabled" -eq "1" ] || return 0
-
   config_get tproxy "main" "tproxy" "$TPROXY"
 
   echo "Cleaning up NFTables rules..."

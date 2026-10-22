@@ -12,9 +12,8 @@ set network.wan.password='${WAN_PASS}'
 
 # ---- 5GHz ----
 set wireless.@wifi-device[1].disabled='0'
+set wireless.@wifi-device[1].country='CN'
 set wireless.@wifi-iface[1].disabled='0'
-set wireless.@wifi-iface[1].mode='ap'
-set wireless.@wifi-iface[1].network='lan'
 set wireless.@wifi-iface[1].encryption='psk2'
 set wireless.@wifi-iface[1].key='${WIFI_KEY}'
 EOF
