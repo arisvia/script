@@ -62,6 +62,12 @@ The build workflow runs on `workflow_dispatch` and weekly on `schedule` (Mon 03:
   - sing-box `urltest` ↔ mihomo `url-test` 类型分组
   - `geoip-cn` / `geoip-private` 在 mihomo 侧由 `GEOIP,CN` / `GEOIP,LAN` 的内置 mmdb 承担，无需 provider
 - **配置体积**: `mihomo.yaml` 用 YAML 锚点（`&mrs` / `&test`）压缩重复字段；sing-box 侧依靠省略 `format`、`update_interval` 等有默认值的字段。新增 provider 时沿用锚点，不要展开。
+- **IPv6 差异（有意为之）**: `mihomo.yaml` 是 `ipv6: true` + `dns.fake-ip-range6`，双栈；`sing-box.json` 的 `dns.strategy` 是 `prefer_ipv4`，`fakeip.inet6_range` 虽配置但仅作兜底。两者面向不同设备：桌面端 mihomo 走双栈，路由器 sing-box 优先 v4。
+- **mihomo 字段坑**:
+  - `global-client-fingerprint` 在 v1.19.33 已移除，改用节点级 `tls.utls.fingerprint`。
+  - `proxy-providers.override` 只支持固定键（`tfo`/`udp`/`skip-cert-verify`/`ip-version` 等），**不支持 `client-fingerprint`**；要改任意字段用 `override.override-expr`。
+  - `tun.dns-mode` 留空即默认按 `dns-hijack` 劫持，日志里 `dns mode:` 后面为空属正常。
+  - `fake-ip-range` 会被推导成 TUN 的 IPv4 地址（取前 30 位），改它等于改 TUN 网段；`fake-ip-range6` 不参与推导，v6 侧用 `tun.inet6-address` 默认值 `fdfe:dcba:9876::1/126`。
 - **Script Minification**: `ip.min.js` is minified. If complex logic changes are needed, ask for the source or structure the edit carefully around the existing minified logic.
 - **OpenWRT WiFi**: 5GHz WiFi requires `option country` to be set (e.g. 'CN', 'US') to enable AP mode; otherwise, it stays disabled.
 

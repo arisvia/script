@@ -4,7 +4,7 @@
 # 下方 route.rules[N] 的下标与 sing-box.json 的 route.rules 数组下标一一对应
 # （[0] sniff、[1] hijack-dns 在 mihomo 侧由 sniffer / dns 配置承担，不占规则行）
 
-ipv6: false
+ipv6: true
 mixed-port: 7890
 # tproxy 透明代理端口（Linux/Android 专属），与 sing-box.json 的 tproxy-in 一致
 # 需配合 tproxy.sh 使用：NFT_TABLE=mihomo PROXY_PORT=12345 ./tproxy.sh start
@@ -16,7 +16,6 @@ allow-lan: true
 unified-delay: true
 tcp-concurrent: true
 find-process-mode: strict
-global-client-fingerprint: chrome
 
 keep-alive-idle: 600
 keep-alive-interval: 15
@@ -41,11 +40,12 @@ external-ui-url: 'https://github.com/Zephyruso/zashboard/releases/latest/downloa
 dns:
   enable: true
   listen: :1053
-  ipv6: false
+  ipv6: true
   prefer-h3: true
   respect-rules: true
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.0/16
+  fake-ip-range6: 'fdfe:dcba:9876::/64'
   fake-ip-filter-mode: blacklist
   cache-size: 2048
   cache-algorithm: arc

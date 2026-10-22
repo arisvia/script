@@ -67,7 +67,7 @@
         "server": "global"
       }
     ],
-    "strategy": "ipv4_only"
+    "strategy": "prefer_ipv4"
   },
   "http_clients": [
     {
