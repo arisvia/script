@@ -756,7 +756,9 @@ jobs:
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r28
-          local-cache: true
+          # 关掉 local-cache：多 job 并发写同一 key 会存入残缺缓存，
+          # 表现为 clang 缺失（.../bin/clang: No such file or directory）
+          local-cache: false
 
       - name: 🔧 Set build tags
         run: |
@@ -862,7 +864,9 @@ jobs:
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r28
-          local-cache: true
+          # 关掉 local-cache：多 job 并发写同一 key 会存入残缺缓存，
+          # 表现为 clang 缺失（.../bin/clang: No such file or directory）
+          local-cache: false
 
       - name: 🔧 Setup Java
         uses: actions/setup-java@v6
