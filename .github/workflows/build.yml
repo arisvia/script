@@ -835,8 +835,11 @@ jobs:
     timeout-minutes: 120
     environment: build
     env:
-      # 依据所选核心分支决定客户端分支，而不是本仓库 ref
-      TARGET_BRANCH: ${{ contains(inputs.target, 'testing') && 'dev' || 'main' }}
+      # 客户端仓库与分支必须与核心分支匹配：
+      #   ref1nd-*  核心含 createAutoRedirectListener 等新接口，官方客户端未实现，会编译失败
+      #   official-* 用官方客户端
+      ANDROID_REPO: ${{ startsWith(inputs.target || 'ref1nd-testing', 'ref1nd') && 'reF1nd/sing-box-for-android' || 'SagerNet/sing-box-for-android' }}
+      TARGET_BRANCH: ${{ startsWith(inputs.target || 'ref1nd-testing', 'ref1nd') && (contains(inputs.target || 'ref1nd-testing', 'testing') && 'reF1nd-testing' || 'reF1nd-stable') || (contains(inputs.target || 'ref1nd-testing', 'testing') && 'dev' || 'main') }}
 
     steps:
       - name: 🔍 Checkout
@@ -882,8 +885,19 @@ jobs:
 
       - name: 🔍 Checkout target branch
         run: |
+          set -euo pipefail
           cd clients/android
-          git checkout "$TARGET_BRANCH"
+          # .gitmodules 固定指向 SagerNet，ref1nd 目标需切换到 reF1nd 的客户端仓库
+          if [[ "$ANDROID_REPO" == "SagerNet/sing-box-for-android" ]]; then
+            REMOTE=origin
+          else
+            git remote add fork "https://github.com/${ANDROID_REPO}.git"
+            REMOTE=fork
+          fi
+          git fetch --depth 1 "$REMOTE" "$TARGET_BRANCH"
+          git checkout -B "$TARGET_BRANCH" FETCH_HEAD
+          echo "client: ${ANDROID_REPO}@${TARGET_BRANCH}"
+          git log --oneline -1
 
       # clients/android 是外部 submodule，无法在本仓库内改文件，
       # 因此在 checkout 之后覆盖 release.keystore 并注入签名参数。
