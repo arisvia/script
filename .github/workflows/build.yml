@@ -95,7 +95,7 @@ env:
 jobs:
   calculate_version:
     name: Calculate version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: build
     outputs:
@@ -270,7 +270,7 @@ jobs:
     name: Linux ${{ matrix.arch }} ${{ matrix.variant }}
     if: inputs.build == 'Binary' || github.event_name == 'schedule'
     needs: calculate_version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: build
     strategy:
@@ -728,7 +728,7 @@ jobs:
     name: Android ${{ matrix.arch }}
     if: inputs.build == 'Binary' || github.event_name == 'schedule'
     needs: calculate_version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment: build
     strategy:
@@ -831,7 +831,7 @@ jobs:
     name: Build Android APKs
     if: inputs.build == 'Apps' && github.event_name != 'schedule'
     needs: calculate_version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: build
     env:
@@ -950,3 +950,77 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+  publish:
+    name: Publish nightly
+    # 仅定时任务发布：workflow_dispatch 的输入已达 10 个上限，无法再加开关
+    if: github.event_name == 'schedule' && needs.calculate_version.outputs.nightly == 'true'
+    needs: [calculate_version, build_linux, build_darwin, build_windows, build_android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: 📂 Unpack archives
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -la
+          # artifact 是 zip，里面才是真正的 tar.gz / ipk / deb
+          for z in *.zip; do
+            [ -e "$z" ] || continue
+            # 直接解到当前目录，避免多一层子目录导致 gh release create 拿到目录
+            unzip -o -q "$z" -d .
+            rm -f "$z"
+          done
+          echo "--- flattened ---"
+          find . -maxdepth 1 -type f | sort
+
+      - name: 🏷️ Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.calculate_version.outputs.version }}
+          BASE_TAGS: ${{ needs.calculate_version.outputs.base_tags }}
+        run: |
+          set -euo pipefail
+          TAG="nightly-$(date -u +%Y%m%d)"
+          # 同日重跑时先删旧 release 与 tag，避免 --clobber 残留陈旧资产
+          gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag || true
+
+          cat > notes.md <<EOF
+          sing-box \`${VERSION}\`
+
+          构建标签：
+          \`\`\`
+          ${BASE_TAGS}
+          \`\`\`
+
+          自动构建产物，未经过人工测试。仅保留最近若干期。
+          EOF
+
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Nightly $(date -u +%Y-%m-%d) · ${VERSION}" \
+            --notes-file notes.md \
+            --prerelease \
+            dist/*
+
+      - name: 🧹 Prune old releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # 只保留最近 8 期，避免 release 页无限增长
+          gh release list --repo "${{ github.repository }}" \
+            --limit 100 --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease) | .tagName' \
+          | { grep '^nightly-' || true; } | sort -r | tail -n +9 | while read -r tag; do
+              echo "deleting $tag"
+              gh release delete "$tag" --repo "${{ github.repository }}" --yes --cleanup-tag || true
+            done
