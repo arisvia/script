@@ -1,15 +1,22 @@
 #!/bin/sh
 
 # ---------------------------------------------------------
-# Sing-Box OpenWrt TProxy NFTables Setup Script
+# Sing-Box / mihomo OpenWrt TProxy NFTables Setup Script
 #
-# 设计要点：
-#   1. 不使用 `socket transparent` 匹配器 —— 它对 UDP 不可靠，
-#      且需要额外 kmod-nft-socket。改用 fwmark 防环，TCP/UDP 统一处理。
-#   2. prerouting / output 开头都以 `meta mark $PROXY_FWMARK return`
-#      拦截已打标流量，阻断本机 output → prerouting 的回环。
-#   3. 依赖检测用 `nft -c` 实测内核能力，避免 lsmod 对
-#      built-in (=y) 模块的误判。
+# 数据流：
+#   LAN 转发流量    → prerouting → tproxy → 本地 socket
+#   路由器本机流量  → output 打 mark → 策略路由回 lo → prerouting → tproxy
+#
+# 关键点：
+#   1. prerouting 里 **绝不能** 对 $PROXY_FWMARK 做 return。
+#      本机流量正是靠 output 打上该 mark 后重入 prerouting 才被 tproxy 接走；
+#      若在此 return，包会绕过 tproxy 直奔本地 1.1.1.1:53 这类不存在的 socket，
+#      dnsmasq 上游查询全部失败 → LAN 客户端解析不了任何域名 → 表现为全网断。
+#   2. divert 链只处理 TCP：socket transparent 命中后重新打 mark 并 accept，
+#      跳过 tproxy。UDP 无连接状态、只有通配 socket，该匹配恒不命中，
+#      因此 divert 不覆盖 UDP。
+#   3. 代理进程自身的出站流量由 $ROUTING_MARK 放行（sing-box default_mark /
+#      mihomo routing-mark），必须与 $PROXY_FWMARK 取不同值。
 # ---------------------------------------------------------
 
 # Configuration
@@ -21,44 +28,6 @@ PROXY_TABLE=${PROXY_TABLE:-100}         # 策略路由表号
 PROXY_RULE_PREF=${PROXY_RULE_PREF:-100} # ip rule 优先级，显式指定避免被 mwan3/Docker 插队
 ROUTING_MARK=${ROUTING_MARK:-0xff}      # 代理进程自身出站流量 mark（sing-box default_mark / mihomo routing-mark）
 NFT_TABLE=${NFT_TABLE:-sing-box}        # nft table 名，sing-box 与 mihomo 各用一张，互不干扰
-
-check_dependencies() {
-  echo "🔍 Checking dependencies..."
-
-  if ! command -v nft >/dev/null 2>&1; then
-    echo "❌ nft 不可用，请安装 nftables-json 或 firewall4"
-    exit 1
-  fi
-
-  # 用真实规则做能力探测：nft -c 只校验不加载
-  # 若内核未提供 nft_tproxy，此处会失败（无论模块是 =y 还是 =m）
-  if ! nft -c -f - >/dev/null 2>&1 <<'EOF'
-table inet _sb_probe {
-  chain prerouting {
-    type filter hook prerouting priority mangle; policy accept;
-    meta l4proto tcp tproxy to :1
-  }
-}
-EOF
-  then
-    echo "❗nft_tproxy 不可用，尝试加载模块..."
-    modprobe nft_tproxy 2>/dev/null || true
-    if ! nft -c -f - >/dev/null 2>&1 <<'EOF'
-table inet _sb_probe {
-  chain prerouting {
-    type filter hook prerouting priority mangle; policy accept;
-    meta l4proto tcp tproxy to :1
-  }
-}
-EOF
-    then
-      echo "❌ 内核缺少 nft_tproxy，请执行: opkg install kmod-nft-tproxy"
-      exit 1
-    fi
-  fi
-
-  echo "✅ nft_tproxy 可用"
-}
 
 setup_policy_routing() {
   # IPv4
@@ -123,17 +92,30 @@ table inet $NFT_TABLE {
   }
 
   # -----------------------
+  # DIVERT：已被 tproxy 接管的 TCP 连接重新打标后放行，跳过下面的 tproxy。
+  # 等价于 iptables 的 `-m socket --transparent -j DIVERT`，需 kmod-nft-socket。
+  #
+  # 只对 TCP 有效：tproxy accept 会为每条连接创建一个绑定到原始目标地址的
+  # 透明 socket，后续包能按四元组查到。UDP 没有连接状态，sing-box/mihomo
+  # 只开一个 0.0.0.0:12345 的通配 socket，靠 IP_RECVORIGDSTADDR 取原目标，
+  # 四元组查不到任何 socket，socket transparent 恒不命中，每个包都必须
+  # 落到下面的 tproxy 处理。
+  # -----------------------
+  chain divert {
+    meta l4proto tcp socket transparent 1 meta mark set $PROXY_FWMARK accept
+  }
+
+  # -----------------------
   # PREROUTING：拦截 LAN 转发流量 / 本机 output 回灌流量
   # -----------------------
   chain prerouting {
     type filter hook prerouting priority mangle; policy accept;
 
-    # 已打标（tproxy 命中或 output 回灌）的流量直接放行，
-    # 交由 ip rule 投递到 lo，避免 UDP 反复 tproxy 形成回环。
-    meta mark $PROXY_FWMARK return
-
     meta l4proto != { tcp, udp } return
 
+    jump divert
+
+    # 目标是路由器本机地址 / 组播 / 广播，不走代理
     fib daddr type local return
     fib daddr type { multicast, broadcast } return
 
@@ -152,9 +134,6 @@ table inet $NFT_TABLE {
     # sing-box 自身出站流量，放行
     meta mark $ROUTING_MARK return
 
-    # 已打标，避免重复处理
-    meta mark $PROXY_FWMARK return
-
     meta l4proto != { tcp, udp } return
 
     fib daddr type local return
@@ -170,7 +149,6 @@ EOF
 }
 
 start() {
-  check_dependencies
   setup_policy_routing
   apply_nft_rules
   echo "✅ sing-box TProxy rules applied."
