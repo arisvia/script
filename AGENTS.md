@@ -1,100 +1,76 @@
-# AI Agent Guide for `script` Repository
+# AGENTS.md
 
-This repository serves two primary functions:
-1. **Configuration Management**: Hosting modular configuration files and plugins for network proxy tools (Quantumult X, Loon, Sing-box).
-2. **Build Orchestration**: A CI/CD pipeline to build custom `sing-box` binaries and Android apps from upstream sources.
+本仓库做两件事：维护代理客户端配置，以及从上游构建 sing-box 二进制与 Android APK。
 
-## Data Structures & Architecture
+## 目录
 
-### Configuration Files (`resource/` & Root)
-- **Root Configs**: `sing-box.json`, `mihomo.yaml`, `loon.conf`, `quanx.conf` are base templates or complete configurations.
-  - `sing-box.json` 与 `mihomo.yaml` 的分流语义**逐条对齐**：规则顺序、出口分组、DNS 策略必须同步修改，否则两套客户端行为不一致。`mihomo.yaml` 的注释里用 `---- sing-box rule N: ... ----` 标注对应关系。
-- **Resource Directory** (`resource/{loon,quanx}/`): Contains modular rule sets.
-  - **Loon**: `.plugin` files. structure usually involves `[Rule]`, `[Rewrite]`, `[Script]`, `[MITM]` sections.
-  - **Quantumult X**: `.conf` files (partial configurations) and `.json` (likely for `task` or specific overrides).
-  - **Naming Convention**: `service.type` (e.g., `netflix.plugin`, `apple.conf`).
-- **Scripts**: `resource/ip.min.js` is a JS script (likely for response manipulation/visualization in proxy apps).
+| 路径 | 内容 |
+|---|---|
+| `sing-box.json` | sing-box 完整配置 |
+| `mihomo.yaml` | mihomo 完整配置 |
+| `loon.conf` / `quanx.conf` | Loon / Quantumult X 配置 |
+| `resource/loon/` `resource/quanx/` | 分模块规则与插件，命名 `service.type` |
+| `resource/ip.min.js` | 压缩过的 JS，改动需谨慎 |
+| `tproxy.sh` | OpenWrt NFTables TProxy 规则 |
+| `sing-box.sh` | OpenWrt procd 启动脚本 |
+| `uci-defaults.sh` | OpenWrt 首启配置，含占位符需替换 |
+| `.github/workflows/build.yml` | CI 构建 |
 
-### Build System (`.github/workflows/build.yml`)
-- **External Source**: The workflow checks out an *external* repository to build `sing-box`; it does **not** build from this local repo. Target is chosen by the `target` input (`official-stable`, `official-testing`, `ref1nd-stable`, `ref1nd-testing`), mapped to repo/branch in the `Resolve target` step.
-- **cmd/internal/read_tag**: Used in the workflow to calculate versions.
-- **Platform Matrix**: Builds for Linux (amd64/arm64, static or purego/glibc/musl), Windows, macOS, Android.
-- **Package Managers**: Generates `.deb`, `.rpm`, `.pkg.tar.zst` (Pacman), `.ipk` (OpenWRT, aarch64 + x86_64).
-- **Build Profile**: `profile` input selects tag set — `lean` (only what `sing-box.json` needs), `standard` (all non-naive), `full` (upstream `release/DEFAULT_BUILD_TAGS*`). Boolean toggles (`with_naive`, `with_cloudflared`, `with_tailscale`, `with_gvisor`, `with_dhcp`, `with_acme`) and `extra_tags` append on top.
-- **Android Signing**: Requires repo/environment secrets `ANDROID_KEYSTORE_BASE64` and `ANDROID_LOCAL_PROPERTIES_BASE64` (both Base64). Missing either fails the `build: Apps` run.
+## 双配置同步
 
-## key Workflows & Commands
+`sing-box.json` 与 `mihomo.yaml` 的分流语义逐条对齐，改规则必须同时改两边。
 
-### 1. Build Triggers
-The build workflow runs on `workflow_dispatch` and weekly on `schedule` (Mon 03:00 UTC). Scheduled runs use `target=ref1nd-testing` + `profile=lean` and skip the APK job.
-- **Input `build`**: Choose `Binary` (core executables) or `Apps` (Android APKs).
-- **Versioning**: Uses `cmd/internal/read_tag` (from the *target* repo). `--nightly` is applied automatically for `*-testing` targets.
+| sing-box | mihomo |
+|---|---|
+| `rule_set` | `rule-providers`（同为 MetaCubeX/meta-rules-dat） |
+| `selector` | `proxy-groups`（`select`） |
+| `urltest` | `proxy-groups`（`url-test`） |
+| `geoip-cn` / `geoip-private` | `GEOIP,CN` / `GEOIP,LAN`，用内置 mmdb，无需 provider |
 
-### 2. OpenWRT & TProxy Setup
-- **`tproxy.sh`**: Shell script generating NFTables rules for Transparent Proxying.
-  - **Key Variables**: `PROXY_PORT` (12345), `PROXY_FWMARK` (0x1), `PROXY_TABLE` (100).
-  - **Usage**: Runs on a Linux router/gateway to divert traffic to `sing-box`. Supports `start`, `stop`, `restart` commands.
-  - **Bypassing**: Includes `byp4` and `byp6` sets for RFC1918 and local addresses.
-- **`sing-box.sh`**: OpenWRT init script (`/etc/init.d/sing-box`).
-  - **Function**: Manages the `sing-box` lifecycle using `procd`.
-  - **Integration**: Automatically calls `tproxy.sh` (configured via `tproxy` variable, default `/etc/sing-box/tproxy.sh`) during `start` and `stop`.
-- **`uci-defaults.sh`**: OpenWRT initialization script.
-  - **Warning**: Contains placeholders (`Username`, `Password`, `WiFi_PWD`) that must be replaced before execution.
-  - **Execution**: Can be injected into `/etc/uci-defaults/` for first-boot configuration.
+`mihomo.yaml` 用 `---- route.rules[N] ----` 注释标注对应下标。
 
-### 3. Sing-box Configuration (`sing-box.json`)
-- **Structure**:
-  - `log` / `dns` / `providers` / `inbounds` / `outbounds` / `route` / `services` / `experimental`。
-  - `dns`: 三个 server —— `global`（8.8.8.8，detour 走 `Available`）、`local`（223.5.5.5，QUIC）、`remote`（fakeip `198.18.0.0/16`）。DNS 规则用 `evaluate` + `geoip-cn match_response` 做国内外分流。
-  - `route`: `rule_set` + `logical` 规则，`final` 是 `Available`，`default_domain_resolver` 是 `global`。
-  - `outbounds`: `selector` 分组（`Available`/`AI`/`Google`/`Media`/`TikTok`/`Spotify`/`Bypass`）+ `urltest` 分组（`Auto`/`HK`/`TW`/`JP`/`KR`/`US`/`SG`/`EU`）。
-  - **规则集**: 全部来自 `MetaCubeX/meta-rules-dat` 的 `.srs`，`format` 由 url 后缀自动推断，`update_interval` 默认 `1d`，均省略。
-- **JSON 注释**: sing-box 的 JSON 解析器支持 `//` 和 `/* */` 注释（`sing-box check` 可验证）。`sing-box format` 会保留注释。可用于标注规则分组。
+## 构建
 
-## Development Constraints & Patterns
+外部仓库构建，不在本仓库编译。
 
-- **Build Isolation**: Since the source code is external, you cannot "fix compilation errors" in *this* repo unless they are related to the workflow YAML itself or the scripts (`sing-box.sh`, `tproxy.sh`, `uci-defaults.sh`).
-- **Config Modularity**: When asked to add a rule for a specific service (e.g., "Add Disney+ support"), check `resource/{app}/` first. If a dedicated file exists, edit it. If not, consider creating `disney.plugin`/`disney.conf`.
-- **Hardcoded Values**: Watch out for hardcoded IP ranges (`198.18.0.0/16` for fakeip) and ports (`12345` for tproxy).
-- **双配置同步**: 改分流规则时 `sing-box.json` 和 `mihomo.yaml` 必须同时改。对应关系：
-  - sing-box `rule_set` ↔ mihomo `rule-providers`（同为 `MetaCubeX/meta-rules-dat` 的 mrs/srs）
-  - sing-box `selector` ↔ mihomo `proxy-groups`（`select` 类型）
-  - sing-box `urltest` ↔ mihomo `url-test` 类型分组
-  - `geoip-cn` / `geoip-private` 在 mihomo 侧由 `GEOIP,CN` / `GEOIP,LAN` 的内置 mmdb 承担，无需 provider
-- **配置体积**: `mihomo.yaml` 用 YAML 锚点（`&mrs` / `&test`）压缩重复字段；sing-box 侧依靠省略 `format`、`update_interval` 等有默认值的字段。新增 provider 时沿用锚点，不要展开。
-- **IPv6 差异（有意为之）**: `mihomo.yaml` 是 `ipv6: true` + `dns.fake-ip-range6`，双栈；`sing-box.json` 的 `dns.strategy` 是 `prefer_ipv4`，`fakeip.inet6_range` 虽配置但仅作兜底。两者面向不同设备：桌面端 mihomo 走双栈，路由器 sing-box 优先 v4。
-- **mihomo 字段坑**:
-  - `global-client-fingerprint` 在 v1.19.33 已移除，改用节点级 `tls.utls.fingerprint`。
-  - `proxy-providers.override` 只支持固定键（`tfo`/`udp`/`skip-cert-verify`/`ip-version` 等），**不支持 `client-fingerprint`**；要改任意字段用 `override.override-expr`。
-  - `tun.dns-mode` 留空即默认按 `dns-hijack` 劫持，日志里 `dns mode:` 后面为空属正常。
-  - `fake-ip-range` 会被推导成 TUN 的 IPv4 地址（取前 30 位），改它等于改 TUN 网段；`fake-ip-range6` 不参与推导，v6 侧用 `tun.inet6-address` 默认值 `fdfe:dcba:9876::1/126`。
-- **Script Minification**: `ip.min.js` is minified. If complex logic changes are needed, ask for the source or structure the edit carefully around the existing minified logic.
-- **OpenWRT WiFi**: 5GHz WiFi requires `option country` to be set (e.g. 'CN', 'US') to enable AP mode; otherwise, it stays disabled.
+- `target`：`official-stable` / `official-testing` / `ref1nd-stable` / `ref1nd-testing`
+- `profile`：`lean`（仅当前配置所需）/ `standard`（全部非 naive）/ `full`（上游默认）
+- `build`：`Binary` 或 `Apps`
+- 定时任务：每周一 03:00 UTC，`target=ref1nd-testing` + `profile=lean`，不发 APK
+- `ref1nd-*` 目标需用 `reF1nd/sing-box-for-android`，官方客户端缺 `createAutoRedirectListener` 等接口会编译失败
+- APK 签名依赖 environment `build` 下的 `ANDROID_KEYSTORE_BASE64` 与 `ANDROID_LOCAL_PROPERTIES_BASE64`
+- 定时任务自动发布 `nightly-YYYYMMDD` release，只留最近 8 期
 
-## Common Task Examples
+## 配置要点
 
-### Adding a new rule to Loon
-File: `resource/loon/universal.plugin` or create `resource/loon/new_service.plugin`
-```ini
-[Rule]
-DOMAIN-SUFFIX,example.com,PROXY
-```
+### sing-box.json
 
-### Modifying TProxy Redirection Port
-File: `tproxy.sh`
-```bash
-# Change default port 12345 to 7890
-PROXY_PORT=7890
-```
+- `dns`：`global`（8.8.8.8 走 `Available`）、`local`（223.5.5.5）、`remote`（fakeip `198.18.0.0/16`）；用 `evaluate` + `geoip-cn match_response` 分流
+- `route`：`final` 是 `Available`，`default_domain_resolver` 是 `local`
+- 规则集用 `.srs`，`format` 与 `update_interval` 由后缀/默认值推断，均省略
+- `inbounds` 里 `tun` 仅作参考，实际部署用 `tproxy`。两者同时启用会产生两套 nftables 规则
+- JSON 解析器支持 `//` 注释，但**本仓库保持纯 JSON**，便于 `jq` / `json.load`
 
-### Update Sing-box Service Logic
-File: `sing-box.sh`
-- Uses `procd` for process management and respawning.
-- Ensure `WORKDIR` exists and permissions are set.
-- Triggers restart on interface events (see `service_triggers`).
+### mihomo.yaml
 
-### Update OpenWRT Init Script
-File: `uci-defaults.sh`
-- Ensure secret placeholders are managed.
-- Use `uci batch` for atomic updates.
-- Set country code for 5GHz functionality.
+- 用 YAML 锚点压缩：`&mrs`（provider）、`&test`（url-test 组）
+- `fake-ip-range` 会被推导成 TUN 的 IPv4 地址（取前 30 位），改它等于改 TUN 网段
+- `fake-ip-range6` 不参与推导，v6 侧用 `tun.inet6-address` 默认值 `fdfe:dcba:9876::1/126`
+- `global-client-fingerprint` 已移除，改用节点级 `tls.utls.fingerprint`
+- `proxy-providers.override` 只支持固定键（`tfo`/`udp`/`skip-cert-verify`/`ip-version` 等），改任意字段用 `override.override-expr`
+- `tun.dns-mode` 留空即按 `dns-hijack` 劫持，日志 `dns mode:` 为空属正常
+- IPv6 有意与 sing-box 不同：mihomo 双栈（`ipv6: true` + `fake-ip-range6`），sing-box 是 `prefer_ipv4`
+
+### tproxy.sh
+
+- `prerouting` 里**不能**对 `$PROXY_FWMARK` 做 return：本机流量靠该 mark 经策略路由回 `prerouting` 才被 tproxy 接走，return 会让它绕过 tproxy 直奔不存在的本地 socket，导致断网
+- `divert` 链只处理 TCP：`socket transparent` 按四元组查 socket，UDP 无连接状态、代理只开通配 socket，匹配恒不命中
+- 变量均可环境变量覆盖，多内核共存时各用独立 `NFT_TABLE` 与 `PROXY_FWMARK`
+- 纯 tproxy 模式下 TCP 在路由器终结，无需 MSS 钳制
+
+## 约束
+
+- 外部源码的编译错误无法在本仓库修复
+- 硬编码值：fakeip `198.18.0.0/16`、tproxy 端口 `12345`、`PROXY_FWMARK=0x1`、`PROXY_TABLE=100`
+- `uci-defaults.sh` 的 `Username` / `Password` / `WiFi_PWD` 是占位符，执行前必须替换
+- 5GHz WiFi 需设 `option country`，否则 AP 不启用
