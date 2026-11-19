@@ -985,7 +985,7 @@ jobs:
       # download-artifact 已把各 artifact zip 解开并按名合并到 dist/，
       # Windows 的 *.zip 是真实发布包，直接作为 release 资产上传，不得再解
       - name: 📥 Download artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
