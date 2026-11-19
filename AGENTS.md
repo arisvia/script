@@ -40,6 +40,8 @@
 - `ref1nd-*` 目标需用 `reF1nd/sing-box-for-android`，官方客户端缺 `createAutoRedirectListener` 等接口会编译失败
 - APK 签名依赖 environment `build` 下的 `ANDROID_KEYSTORE_BASE64` 与 `ANDROID_LOCAL_PROPERTIES_BASE64`
 - 定时任务自动发布 `nightly-YYYYMMDD` release，只留最近 8 期
+- Windows job 的 `shell: bash` 里 `tar` 是 Git 自带的 GNU tar，不认 `.zip` 后缀：`tar -a -c -f x.zip` 会静默写出换皮 tar，下游 `unzip` 报 Exit 9（End-of-central-directory not found）。必须显式调用 `/c/Windows/System32/tar.exe`（bsdtar）并打扁平包
+- `download-artifact` 的 `merge-multiple: true` 已把各 artifact zip 解平到 `dist/`，发布侧不需要再解一层
 
 ## 配置要点
 

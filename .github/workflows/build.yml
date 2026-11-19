@@ -706,7 +706,10 @@ jobs:
           if [ -f libcronet.dll ]; then
             cp libcronet.dll "$DIR_NAME"
           fi
-          tar -a -c -f "${DIR_NAME}.zip" "$DIR_NAME"
+          # shell: bash 下 tar 是 Git 自带的 GNU tar，不认 .zip 后缀，-a 会静默写出
+          # 换皮 tar（unzip 报 Exit 9: End-of-central-directory signature not found）。
+          # 必须显式用 bsdtar，并与官方一致打成扁平 zip
+          ( cd "$DIR_NAME" && /c/Windows/System32/tar.exe -a -c -f "../${DIR_NAME}.zip" ./* )
 
       - name: 🧹 Cleanup
         run: |
@@ -979,26 +982,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      # download-artifact 已把各 artifact zip 解开并按名合并到 dist/，
+      # Windows 的 *.zip 是真实发布包，直接作为 release 资产上传，不得再解
       - name: 📥 Download artifacts
         uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
 
-      - name: 📂 Unpack archives
-        run: |
-          set -euo pipefail
-          cd dist
-          ls -la
-          # artifact 是 zip，里面才是真正的 tar.gz / ipk / deb
-          for z in *.zip; do
-            [ -e "$z" ] || continue
-            # 直接解到当前目录，避免多一层子目录导致 gh release create 拿到目录
-            unzip -o -q "$z" -d .
-            rm -f "$z"
-          done
-          echo "--- flattened ---"
-          find . -maxdepth 1 -type f | sort
+      - name: 📋 List assets
+        run: ls -la dist
 
       - name: 🏷️ Create release
         env:
